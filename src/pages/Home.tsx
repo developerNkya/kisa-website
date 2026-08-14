@@ -6,61 +6,50 @@ import { ContinueReading } from '../components/home/ContinueReading';
 import { OngoingReleases } from '../components/home/OngoingReleases';
 import { OriginalsSpotlight } from '../components/home/OriginalsSpotlight';
 import { FreeStarter } from '../components/home/FreeStarter';
-import { categoryMeta } from '../data/stories'; // keeping metadata for categories
+import { categoryMeta, stories as fallbackStories, trendingStories as fallbackTrending, newStories as fallbackNew } from '../data/stories';
 
 export function Home() {
-  const [featuredStory, setFeaturedStory] = useState<any>(null);
-  const [newStories, setNewStories] = useState<any[]>([]);
-  const [trendingStories, setTrendingStories] = useState<any[]>([]);
-  const [allStories, setAllStories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [newStories, setNewStories] = useState<any[]>(fallbackNew);
+  const [trendingStories, setTrendingStories] = useState<any[]>(fallbackTrending);
+  const [allStories, setAllStories] = useState<any[]>(fallbackStories);
 
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
-        const { data: stories } = await supabase
+        const { data: dbStories, error } = await supabase
           .from('stories')
-          .select('*, authors(*)')
+          .select('*, authors(*), categories(*)')
           .eq('status', 'published')
           .order('created_at', { ascending: false });
 
-        if (stories) {
-          const formatted = stories.map((s: any) => ({
+        if (!error && dbStories && dbStories.length > 0) {
+          const formatted = dbStories.map((s: any) => ({
             ...s,
-            cover: s.cover_url, // map to component props
-            episodes: Array(s.total_episodes || 5).fill({}), // Mock for component if needed
+            cover: s.cover_url || '/covers/default.jpg',
+            genres: s.categories?.name ? [s.categories.name] : (s.tags || ['Hadithi']),
+            episodes: Array(s.total_episodes || 5).fill({}),
           }));
           
           setAllStories(formatted);
-          
-          // Featured
-          const featured = formatted.find((s: any) => s.is_featured);
-          setFeaturedStory(featured || formatted[0]);
-          
-          // New
           setNewStories(formatted.slice(0, 12));
           
-          // Trending (Sort by reads or a mock trending if reads aren't available)
-          const trending = [...formatted].sort((a, b) => (b.reads || 0) - (a.reads || 0)).slice(0, 10);
+          const trending = [...formatted].sort((a, b) => (b.total_reads || 0) - (a.total_reads || 0)).slice(0, 10);
           setTrendingStories(trending);
         }
       } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching home stories:', e);
       }
     }
     loadData();
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-mist">Inapakia...</div>;
-
   const byGenre = (genre: string) => allStories.filter((s: any) => (s.genres || []).includes(genre)).slice(0, 8);
 
   return (
     <>
-      {featuredStory && <StoryHero />}
+      {/* Top Slider Hero Images */}
+      <StoryHero />
+      
       <ContinueReading />
       
       {trendingStories.length > 0 && (
@@ -86,7 +75,7 @@ export function Home() {
       {byGenre('Mapenzi').length > 0 && (
         <StoryRail
           title="Mapenzi ❤️"
-          blurb={categoryMeta.Mapenzi.blurb}
+          blurb={categoryMeta.Mapenzi?.blurb || 'Hadithi za mapenzi na hisia.'}
           stories={byGenre('Mapenzi')}
           href="/makundi/Mapenzi"
         />
