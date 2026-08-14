@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { AuthProvider } from './lib/AuthContext';
 import { KisaProvider } from './contexts/KisaContext';
 import { SiteLayout } from './components/layout/SiteLayout';
 import { AdminLayout } from './components/admin/AdminLayout';
@@ -34,63 +35,88 @@ import { AdminSubscriptions } from './pages/admin/AdminSubscriptions';
 import { AdminPayments } from './pages/admin/AdminPayments';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminSettings } from './pages/admin/AdminSettings';
+import { useAuth } from './lib/AuthContext';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div>Inapakia...</div>;
+  if (!user) return <Navigate to="/ingia" replace />;
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAdmin, loading } = useAuth();
+  if (loading) return <div>Inapakia...</div>;
+  if (!user || !isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
 
 export function App() {
   return (
-    <KisaProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<SiteLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/hadithi" element={<Stories />} />
-            <Route path="/hadithi/:slug" element={<StoryDetail />} />
-            <Route path="/zinazopendwa" element={<Trending />} />
-            <Route path="/mpya" element={<NewStories />} />
-            <Route path="/makundi" element={<Categories />} />
-            <Route path="/makundi/:name" element={<Category />} />
-            <Route path="/tafuta" element={<Search />} />
-            <Route path="/zilizohifadhiwa" element={<Saved />} />
-            <Route path="/akaunti" element={<Dashboard />} />
-            <Route path="/wasifu" element={<Profile />} />
-            <Route path="/premium" element={<Subscribe />} />
-            <Route path="/malipo" element={<Payment />} />
-            <Route path="/karibu" element={<Landing />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
+    <AuthProvider>
+      <KisaProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<SiteLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/hadithi" element={<Stories />} />
+              <Route path="/hadithi/:slug" element={<StoryDetail />} />
+              <Route path="/zinazopendwa" element={<Trending />} />
+              <Route path="/mpya" element={<NewStories />} />
+              <Route path="/makundi" element={<Categories />} />
+              <Route path="/makundi/:name" element={<Category />} />
+              <Route path="/tafuta" element={<Search />} />
+              <Route path="/zilizohifadhiwa" element={
+                <ProtectedRoute><Saved /></ProtectedRoute>
+              } />
+              <Route path="/akaunti" element={
+                <ProtectedRoute><Dashboard /></ProtectedRoute>
+              } />
+              <Route path="/wasifu" element={
+                <ProtectedRoute><Profile /></ProtectedRoute>
+              } />
+              <Route path="/premium" element={<Subscribe />} />
+              <Route path="/malipo" element={<Payment />} />
+              <Route path="/karibu" element={<Landing />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
 
-          <Route path="/soma/:slug/:episode" element={<Reader />} />
-          <Route path="/ingia" element={<Login />} />
-          <Route path="/jisajili" element={<Register />} />
+            <Route path="/soma/:slug/:episode" element={<Reader />} />
+            <Route path="/ingia" element={<Login />} />
+            <Route path="/jisajili" element={<Register />} />
 
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="stories" element={<AdminStories />} />
-            <Route path="stories/new" element={<AdminCreateStory />} />
-            <Route path="episodes" element={<AdminEpisodes />} />
-            <Route path="episodes/new" element={<AdminCreateEpisode />} />
-            <Route path="authors" element={<AdminAuthors />} />
-            <Route path="categories" element={<AdminCategories />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="subscriptions" element={<AdminSubscriptions />} />
-            <Route path="payments" element={<AdminPayments />} />
-            <Route path="analytics" element={<AdminAnalytics />} />
-            <Route path="settings" element={<AdminSettings />} />
-            <Route path="*" element={<Navigate to="/admin" replace />} />
-          </Route>
-        </Routes>
+            <Route path="/admin" element={
+              <AdminRoute><AdminLayout /></AdminRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="stories" element={<AdminStories />} />
+              <Route path="stories/new" element={<AdminCreateStory />} />
+              <Route path="episodes" element={<AdminEpisodes />} />
+              <Route path="episodes/new" element={<AdminCreateEpisode />} />
+              <Route path="authors" element={<AdminAuthors />} />
+              <Route path="categories" element={<AdminCategories />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="subscriptions" element={<AdminSubscriptions />} />
+              <Route path="payments" element={<AdminPayments />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="settings" element={<AdminSettings />} />
+              <Route path="*" element={<Navigate to="/admin" replace />} />
+            </Route>
+          </Routes>
 
-        <Toaster
-          theme="dark"
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: '#20191B',
-              border: '1px solid #332A2D',
-              color: '#F6F0E8'
-            }
-          }} />
-        
-      </BrowserRouter>
-    </KisaProvider>);
-
+          <Toaster
+            theme="dark"
+            position="top-center"
+            toastOptions={{
+              style: {
+                background: '#20191B',
+                border: '1px solid #332A2D',
+                color: '#F6F0E8'
+              }
+            }}
+          />
+        </BrowserRouter>
+      </KisaProvider>
+    </AuthProvider>
+  );
 }

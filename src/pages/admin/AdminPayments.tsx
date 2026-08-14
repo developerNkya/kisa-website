@@ -1,49 +1,93 @@
-import React from 'react';
-import { AdminPanel, AdminTable, RowActions, StatusPill, Td } from '../../components/admin/AdminTable';
-import { StatsCard } from '../../components/admin/StatsCard';
-import { SimpleBarChart } from '../../components/admin/Charts';
-import { adminPayments, growthSeries } from '../../data/admin';
-import { tzs } from '../../utils/format';
+import React, { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { Loader2Icon, ExternalLinkIcon } from 'lucide-react';
+import { AdminPanel, AdminTable, StatusPill, Td } from '../../components/admin/AdminTable';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
+import { toast } from 'sonner';
 
 export function AdminPayments() {
+  const { isAdmin } = useAuth();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTransactions();
+  }, [isAdmin]);
+
+  async function loadTransactions() {
+    if (!isAdmin) return;
+    try {
+      const { data, error } = await supabase
+        .from('subscription_transactions')
+        .select('*, profiles(full_name, email)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load transactions');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!isAdmin) return <Navigate to="/" replace />;
+
+  const totalRevenue = transactions
+    .filter(t => t.status === 'completed')
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="font-display text-2xl font-bold text-zinc-50">Payments</h1>
-        <p className="mt-1 text-sm text-zinc-500">Miamala ya M-Pesa, Airtel Money, Mixx by Yas na HaloPesa</p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-zinc-50">Payments</h1>
+          <p className="mt-1 text-sm text-zinc-500">Miamala yote ya mfumo</p>
+        </div>
+        <div className="rounded-md border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-right">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Total Revenue</p>
+          <p className="font-display text-xl font-bold text-amber-400">TZS {totalRevenue.toLocaleString()}</p>
+        </div>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatsCard label="Revenue mwezi huu" value="TZS 9,642,000" delta="+9.7%" emphasis />
-        <StatsCard label="Total transactions" value="4,976" delta="+11.2%" />
-        <StatsCard label="Average subscriber value" value="TZS 2,000" delta="0%" />
-      </div>
-
-      <AdminPanel title="Monthly revenue" description="Mapato ya miezi 7 (TZS)">
-        <div className="p-4">
-          <SimpleBarChart data={growthSeries} dataKey="revenue" xKey="month" color="#C42B53" height={250} />
-        </div>
+      <AdminPanel title="All Transactions" description="Rekodi za malipo">
+        {loading ? (
+          <div className="flex h-40 justify-center items-center">
+            <Loader2Icon className="h-6 w-6 animate-spin text-wine" />
+          </div>
+        ) : (
+          <AdminTable columns={['Reference', 'Customer', 'Method', 'Amount', 'Status', 'Date', 'Receipt']}>
+            {transactions.map((t) => (
+              <tr key={t.id} className="hover:bg-zinc-900/50">
+                <Td className="font-mono text-xs text-zinc-400">{t.reference}</Td>
+                <Td>
+                  <div className="font-medium text-zinc-100">{t.profiles?.full_name || t.customer_name || 'Unknown'}</div>
+                  <div className="text-xs text-zinc-500">{t.profiles?.email || t.customer_email || '-'}</div>
+                </Td>
+                <Td className="uppercase text-xs">{t.payment_method}</Td>
+                <Td className="tabular-nums font-medium text-zinc-200">TZS {(t.amount || 0).toLocaleString()}</Td>
+                <Td>
+                  <StatusPill status={t.status === 'completed' ? 'Successful' : t.status === 'pending' ? 'Pending' : 'Failed'} />
+                </Td>
+                <Td className="text-zinc-500 text-xs">{new Date(t.created_at).toLocaleString()}</Td>
+                <Td>
+                  {t.payment_url ? (
+                    <a href={t.payment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300">
+                      <ExternalLinkIcon className="h-3 w-3" />
+                      <span className="text-xs">Link</span>
+                    </a>
+                  ) : '-'}
+                </Td>
+              </tr>
+            ))}
+            {transactions.length === 0 && (
+              <tr><Td colSpan={7} className="text-center py-4">No transactions found</Td></tr>
+            )}
+          </AdminTable>
+        )}
       </AdminPanel>
-
-      <AdminPanel title="Transactions" description="Miamala ya hivi karibuni">
-        <AdminTable columns={['Transaction ID', 'User', 'Amount', 'Date', 'Method', 'Status', 'Actions']}>
-          {adminPayments.map((p) =>
-          <tr key={p.id} className="hover:bg-zinc-900/50">
-              <Td className="font-mono text-xs text-zinc-400">{p.id}</Td>
-              <Td className="font-medium text-zinc-100">{p.user}</Td>
-              <Td className="tabular-nums">{tzs(p.amount)}</Td>
-              <Td className="text-zinc-500">{p.date}</Td>
-              <Td>{p.method}</Td>
-              <Td>
-                <StatusPill status={p.status} />
-              </Td>
-              <Td>
-                <RowActions actions={p.status === 'Failed' ? ['Retry', 'View'] : ['View', 'Receipt']} />
-              </Td>
-            </tr>
-          )}
-        </AdminTable>
-      </AdminPanel>
-    </div>);
-
+    </div>
+  );
 }

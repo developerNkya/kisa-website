@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { BellIcon, BookmarkIcon, SearchIcon } from 'lucide-react';
+import { BellIcon, BookmarkIcon, SearchIcon, LogOut, Crown } from 'lucide-react';
 import { ButtonLink } from '../ui/Button';
 import { NotificationPanel } from '../NotificationPanel';
-import { useKisa } from '../../contexts/KisaContext';
+import { useAuth } from '../../lib/AuthContext';
 import { cn } from '../../utils/cn';
 
 const links = [
@@ -17,7 +17,7 @@ const links = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const { user } = useKisa();
+  const { user, profile, isPremium, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,6 +26,14 @@ export function Navbar() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/ingia');
+  };
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Mtumiaji';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <header
@@ -101,15 +109,30 @@ export function Navbar() {
                 </button>
                 <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
               </div>
-              <Link
-              to="/akaunti"
-              className="ml-1 flex items-center gap-2 rounded-full border border-line bg-surface-raised py-1 pl-1 pr-3.5 transition-colors duration-150 ease-kisa hover:border-mist/50">
-              
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-wine font-display text-sm font-bold text-cream">
-                  {user.name.charAt(0)}
-                </span>
-                <span className="hidden text-sm font-medium text-cream sm:inline">{user.name}</span>
-              </Link>
+              <div className="ml-1 flex items-center gap-2">
+                <Link
+                  to="/akaunti"
+                  className="flex items-center gap-2 rounded-full border border-line bg-surface-raised py-1 pl-1 pr-3.5 transition-colors duration-150 ease-kisa hover:border-mist/50">
+                
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-wine font-display text-sm font-bold text-cream relative">
+                    {initial}
+                    {isPremium && (
+                      <span className="absolute -bottom-1 -right-1 bg-ink rounded-full p-0.5">
+                        <Crown className="w-3 h-3 text-gold" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="hidden text-sm font-medium text-cream sm:inline">{displayName}</span>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  aria-label="Toka"
+                  title="Toka"
+                  className="grid h-10 w-10 place-items-center rounded-full text-mist transition-colors duration-150 ease-kisa hover:bg-surface-raised hover:text-wine-bright"
+                >
+                  <LogOut className="h-[18px] w-[18px]" />
+                </button>
+              </div>
             </> :
 
           <div className="ml-1 flex items-center gap-2">

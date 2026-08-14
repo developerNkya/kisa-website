@@ -57,8 +57,8 @@ export function AdminTable({
 
 }
 
-export function Td({ children, className }: {children: React.ReactNode;className?: string;}) {
-  return <td className={cn('whitespace-nowrap px-4 py-3.5 text-zinc-300 sm:px-5', className)}>{children}</td>;
+export function Td({ children, className, colSpan, ...props }: {children: React.ReactNode;className?: string;colSpan?: number;} & React.TdHTMLAttributes<HTMLTableCellElement>) {
+  return <td colSpan={colSpan} className={cn('whitespace-nowrap px-4 py-3.5 text-zinc-300 sm:px-5', className)} {...props}>{children}</td>;
 }
 
 export function StatusPill({ status }: {status: string;}) {

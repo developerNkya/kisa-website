@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom';
 import { BookOpenIcon, ClockIcon } from 'lucide-react';
 import { Story } from '../types';
 import { NewBadge, OriginalBadge, PremiumBadge } from './ui/Badge';
-import { ProgressBar } from './ui/ProgressBar';
 import { BookmarkButton } from './BookmarkButton';
-import { useKisa } from '../contexts/KisaContext';
 import { cn } from '../utils/cn';
 import { readingLabel, totalMinutes } from '../utils/format';
 
@@ -17,24 +15,23 @@ interface StoryCardProps {
 }
 
 export function StoryCard({ story, size = 'md', showDescription = false, className }: StoryCardProps) {
-  const { progressFor } = useKisa();
-  const progress = progressFor(story.id);
-  const minutes = totalMinutes(story.episodes.map((e) => e.readingMinutes));
+  const episodes = story.episodes || [];
+  const minutes = totalMinutes(episodes.map((e) => e.readingMinutes || 5));
 
   return (
     <article className={cn('group flex h-full flex-col', className)}>
       <Link
         to={`/hadithi/${story.slug}`}
-        className="relative block overflow-hidden rounded-card border border-line-soft bg-surface">
-        
+        className="relative block overflow-hidden rounded-card border border-line-soft bg-surface"
+      >
         <div className="aspect-[2/3] w-full overflow-hidden">
           <img
             src={story.cover}
             alt={`Jalada la hadithi ${story.title}`}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 ease-kisa group-hover:scale-[1.04]" />
-          
+            className="h-full w-full object-cover transition-transform duration-300 ease-kisa group-hover:scale-[1.04]"
+          />
         </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink via-ink/10 to-transparent opacity-90" />
 
@@ -52,7 +49,7 @@ export function StoryCard({ story, size = 'md', showDescription = false, classNa
           <div className="flex items-center gap-2 text-[11px] font-medium text-cream/80">
             <span className="inline-flex items-center gap-1">
               <BookOpenIcon className="h-3 w-3 text-gold" aria-hidden="true" />
-              {story.episodes.length} Sehemu
+              {episodes.length} Sehemu
             </span>
             <span aria-hidden="true" className="text-dust">·</span>
             <span className="inline-flex items-center gap-1">
@@ -68,28 +65,18 @@ export function StoryCard({ story, size = 'md', showDescription = false, classNa
           className={cn(
             'font-display font-bold leading-tight text-cream',
             size === 'lg' ? 'text-lg' : size === 'sm' ? 'text-sm' : 'text-base'
-          )}>
-          
+          )}
+        >
           <Link to={`/hadithi/${story.slug}`} className="transition-colors duration-150 ease-kisa hover:text-gold">
             {story.title}
           </Link>
         </h3>
-        <p className="mt-1 text-xs text-mist">{story.genres.join(' · ')}</p>
-        {showDescription &&
-        <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-dust">{story.hook}</p>
-        }
-
-        {progress ?
-        <div className="mt-auto pt-3">
-            <ProgressBar percent={progress.percent} label={`Maendeleo ya ${story.title}`} />
-            <p className="mt-1.5 text-[11px] text-mist">
-              Sehemu ya {progress.episodeNumber} · {progress.percent}%
-            </p>
-          </div> :
-
+        <p className="mt-1 text-xs text-mist">{(story.genres || []).join(' · ')}</p>
+        {showDescription && (
+          <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-dust">{story.hook}</p>
+        )}
         <div className="mt-auto" />
-        }
       </div>
-    </article>);
-
+    </article>
+  );
 }

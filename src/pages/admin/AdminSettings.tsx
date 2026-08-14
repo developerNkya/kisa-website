@@ -1,95 +1,119 @@
-import React, { useState } from 'react';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
+import { Loader2Icon, UserIcon } from 'lucide-react';
 import { AdminPanel } from '../../components/admin/AdminTable';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
+import { toast } from 'sonner';
 import { cn } from '../../utils/cn';
 
 const inputClass =
-'w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none';
+  'w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none';
 const labelClass = 'mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-zinc-500';
 
 export function AdminSettings() {
-  const [price, setPrice] = useState('2000');
-  const [freeEpisodes, setFreeEpisodes] = useState('3');
-  const [toggles, setToggles] = useState({ signups: true, maintenance: false, autoPublish: true });
+  const { user, profile, isAdmin } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const rows: {key: keyof typeof toggles;label: string;hint: string;}[] = [
-  { key: 'signups', label: 'Allow new signups', hint: 'Wageni wapya wanaweza kufungua akaunti.' },
-  { key: 'maintenance', label: 'Maintenance mode', hint: 'Tovuti inaonyesha ujumbe wa matengenezo.' },
-  { key: 'autoPublish', label: 'Auto-publish scheduled episodes', hint: 'Sehemu zinajichapisha kwa muda uliowekwa.' }];
+  useEffect(() => {
+    if (profile) {
+      setName(profile.full_name || '');
+      setEmail(profile.email || '');
+    }
+  }, [profile]);
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: name, email })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      toast.success('Profile updated successfully');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <header>
         <h1 className="font-display text-2xl font-bold text-zinc-50">Settings</h1>
-        <p className="mt-1 text-sm text-zinc-500">Mipangilio ya jukwaa la KISA</p>
+        <p className="mt-1 text-sm text-zinc-500">Manage your admin profile and platform settings</p>
       </header>
 
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
-        <AdminPanel title="Subscription" description="Bei na sehemu za bure">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              toast.success('Settings saved');
-            }}
-            className="space-y-4 p-4 sm:p-5">
-            
-            <div>
-              <label htmlFor="price" className={labelClass}>
-                Monthly price (TZS)
-              </label>
-              <input id="price" value={price} onChange={(e) => setPrice(e.target.value)} className={inputClass} />
+      <AdminPanel title="Admin Profile">
+        <form onSubmit={handleUpdateProfile} className="p-4 sm:p-5 space-y-4">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
+              <UserIcon className="h-8 w-8" />
             </div>
             <div>
-              <label htmlFor="free-eps" className={labelClass}>
-                Free episodes per premium story
-              </label>
+              <p className="font-medium text-zinc-100">{profile?.full_name}</p>
+              <p className="text-sm text-zinc-500">{profile?.role}</p>
+            </div>
+          </div>
+          
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="name" className={labelClass}>Full Name</label>
               <input
-                id="free-eps"
-                value={freeEpisodes}
-                onChange={(e) => setFreeEpisodes(e.target.value)}
-                className={inputClass} />
-              
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={inputClass}
+                required
+              />
             </div>
+            <div>
+              <label htmlFor="email" className={labelClass}>Email Address</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
+          </div>
+          
+          <div className="border-t border-zinc-800 pt-4 mt-6">
             <button
               type="submit"
-              className="rounded-md bg-wine px-4 py-2.5 text-sm font-semibold text-cream hover:bg-wine-bright">
-              
-              Save settings
+              disabled={isSubmitting}
+              className="flex justify-center items-center gap-2 rounded-md bg-wine px-4 py-2.5 text-sm font-semibold text-cream hover:bg-wine-bright disabled:opacity-50">
+              {isSubmitting && <Loader2Icon className="h-4 w-4 animate-spin" />}
+              Save Changes
             </button>
-          </form>
-        </AdminPanel>
+          </div>
+        </form>
+      </AdminPanel>
 
-        <AdminPanel title="Platform" description="Hali ya jukwaa">
-          <ul className="divide-y divide-zinc-800/70">
-            {rows.map((r) =>
-            <li key={r.key} className="flex items-start justify-between gap-4 px-4 py-4 sm:px-5">
-                <span>
-                  <span className="block text-sm font-medium text-zinc-100">{r.label}</span>
-                  <span className="block text-xs text-zinc-500">{r.hint}</span>
-                </span>
-                <button
-                role="switch"
-                aria-checked={toggles[r.key]}
-                aria-label={r.label}
-                onClick={() => setToggles((t) => ({ ...t, [r.key]: !t[r.key] }))}
-                className={cn(
-                  'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-150 ease-kisa',
-                  toggles[r.key] ? 'bg-emerald-600' : 'bg-zinc-700'
-                )}>
-                
-                  <span
-                  className={cn(
-                    'absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-150 ease-kisa',
-                    toggles[r.key] ? 'translate-x-[22px]' : 'translate-x-0.5'
-                  )} />
-                
-                </button>
-              </li>
-            )}
-          </ul>
-        </AdminPanel>
-      </div>
-    </div>);
-
+      <AdminPanel title="Platform Settings" description="UI only - settings placeholder">
+        <div className="p-4 sm:p-5 space-y-4 opacity-75 pointer-events-none">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Site Name</label>
+              <input value="KISA Story Platform" readOnly className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Support Email</label>
+              <input value="support@kisa.co.tz" readOnly className={inputClass} />
+            </div>
+          </div>
+        </div>
+      </AdminPanel>
+    </div>
+  );
 }
