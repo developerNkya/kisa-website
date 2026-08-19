@@ -29,6 +29,7 @@ import { AdminCreateStory } from './pages/admin/AdminCreateStory';
 import { AdminEditStory } from './pages/admin/AdminEditStory';
 import { AdminEpisodes } from './pages/admin/AdminEpisodes';
 import { AdminCreateEpisode } from './pages/admin/AdminCreateEpisode';
+import { AdminEditEpisode } from './pages/admin/AdminEditEpisode';
 import { AdminAuthors } from './pages/admin/AdminAuthors';
 import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminUsers } from './pages/admin/AdminUsers';
@@ -95,6 +96,7 @@ export function App() {
               <Route path="stories/:id/edit" element={<AdminEditStory />} />
               <Route path="episodes" element={<AdminEpisodes />} />
               <Route path="episodes/new" element={<AdminCreateEpisode />} />
+              <Route path="episodes/:id/edit" element={<AdminEditEpisode />} />
               <Route path="authors" element={<AdminAuthors />} />
               <Route path="categories" element={<AdminCategories />} />
               <Route path="users" element={<AdminUsers />} />

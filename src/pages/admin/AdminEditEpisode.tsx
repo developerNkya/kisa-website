@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BoldIcon, ItalicIcon, ListIcon, QuoteIcon, Redo2Icon, Undo2Icon, Loader2Icon } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useParams } from 'react-router-dom';
 import { AdminPanel } from '../../components/admin/AdminTable';
 import { cn } from '../../utils/cn';
 import { supabase } from '../../lib/supabase';
@@ -11,11 +11,28 @@ const inputClass =
   'w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none';
 const labelClass = 'mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-zinc-500';
 
-export function AdminCreateEpisode() {
+/** Extract bare video ID from any YouTube URL format, or return as-is if already an ID */
+function extractYoutubeId(input: string): string {
+  const trimmed = input.trim();
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === 'youtu.be') return url.pathname.slice(1).split('?')[0];
+    const v = url.searchParams.get('v');
+    if (v) return v;
+    const embedMatch = url.pathname.match(/\/embed\/([^/?]+)/);
+    if (embedMatch) return embedMatch[1];
+  } catch {
+    // Not a URL — assume it's already a bare ID
+  }
+  return trimmed;
+}
+
+export function AdminEditEpisode() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+
   const [stories, setStories] = useState<any[]>([]);
-  
   const [storyId, setStoryId] = useState('');
   const [number, setNumber] = useState('1');
   const [title, setTitle] = useState('');
@@ -24,46 +41,41 @@ export function AdminCreateEpisode() {
   const [isFree, setIsFree] = useState(true);
   const [status, setStatus] = useState('draft');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const words = content.trim() ? content.trim().split(/\s+/).length : 0;
   const minutes = Math.max(1, Math.round(words / 180));
 
-  /** Extract bare video ID from any YouTube URL format, or return as-is if already an ID */
-  function extractYoutubeId(input: string): string {
-    const trimmed = input.trim();
+  useEffect(() => {
+    if (isAdmin) loadAll();
+  }, [isAdmin, id]);
+
+  async function loadAll() {
+    setLoading(true);
     try {
-      // youtu.be/ID or youtube.com/watch?v=ID or youtube.com/embed/ID
-      const url = new URL(trimmed);
-      if (url.hostname === 'youtu.be') return url.pathname.slice(1).split('?')[0];
-      const v = url.searchParams.get('v');
-      if (v) return v;
-      const embedMatch = url.pathname.match(/\/embed\/([^/?]+)/);
-      if (embedMatch) return embedMatch[1];
-    } catch {
-      // Not a URL — assume it's already a bare ID
+      const [epRes, stRes] = await Promise.all([
+        supabase.from('episodes').select('*').eq('id', id).single(),
+        supabase.from('stories').select('id, title').order('title'),
+      ]);
+
+      if (epRes.error || !epRes.data) throw new Error('Episode not found');
+      const ep = epRes.data;
+
+      setStoryId(ep.story_id || '');
+      setNumber(String(ep.episode_number || 1));
+      setTitle(ep.title || '');
+      setContent(ep.content || '');
+      setYoutubeVideoId(ep.youtube_video_id || '');
+      setIsFree(ep.is_free ?? true);
+      setStatus(ep.status || 'draft');
+
+      if (stRes.data) setStories(stRes.data);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load episode');
+    } finally {
+      setLoading(false);
     }
-    return trimmed;
   }
-
-  useEffect(() => {
-    if (isAdmin) loadStories();
-  }, [isAdmin]);
-
-  async function loadStories() {
-    const { data } = await supabase.from('stories').select('id, title').order('title');
-    if (data) {
-      setStories(data);
-      if (data.length > 0) setStoryId(data[0].id);
-    }
-  }
-
-  // Auto-suggest is_free based on episode number
-  useEffect(() => {
-    const epNum = parseInt(number, 10);
-    if (!isNaN(epNum)) {
-      setIsFree(epNum <= 3);
-    }
-  }, [number]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +87,7 @@ export function AdminCreateEpisode() {
     setIsSubmitting(true);
     try {
       const epNum = parseInt(number, 10);
-      const { error } = await supabase.from('episodes').insert({
+      const { error } = await supabase.from('episodes').update({
         story_id: storyId,
         episode_number: isNaN(epNum) ? 1 : epNum,
         title: title || null,
@@ -84,29 +96,30 @@ export function AdminCreateEpisode() {
         is_free: isFree,
         reading_minutes: minutes,
         status,
-        published_at: status === 'published' ? new Date().toISOString() : null
-      });
+        published_at: status === 'published' ? new Date().toISOString() : null,
+      }).eq('id', id);
 
       if (error) throw error;
-      toast.success('Episode created successfully');
+      toast.success('Episode updated successfully');
       navigate('/admin/episodes');
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Failed to create episode');
+      toast.error(err.message || 'Failed to update episode');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!isAdmin) return <Navigate to="/" replace />;
+  if (loading) return <div className="flex h-40 items-center justify-center text-mist">Inapakia...</div>;
 
   const selectedStoryTitle = stories.find(s => s.id === storyId)?.title || 'Story';
 
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="font-display text-2xl font-bold text-zinc-50">Create Episode</h1>
-        <p className="mt-1 text-sm text-zinc-500">Andika sehemu mpya ya hadithi.</p>
+        <h1 className="font-display text-2xl font-bold text-zinc-50">Edit Episode</h1>
+        <p className="mt-1 text-sm text-zinc-500">Hariri sehemu ya hadithi.</p>
       </header>
 
       <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[1.6fr_1fr] xl:items-start">
@@ -115,38 +128,24 @@ export function AdminCreateEpisode() {
             <div className="grid gap-4 p-4 sm:grid-cols-[1fr_100px] sm:p-5">
               <div>
                 <label htmlFor="ep-story" className={labelClass}>Story</label>
-                <select id="ep-story" value={storyId} onChange={(e) => setStoryId(e.target.value)} required className={inputClass}>
-                  {stories.map((s) => (
-                    <option key={s.id} value={s.id}>{s.title}</option>
-                  ))}
+                <select id="ep-story" value={storyId} onChange={e => setStoryId(e.target.value)} required className={inputClass}>
+                  {stories.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="ep-number" className={labelClass}>Number</label>
-                <input
-                  id="ep-number"
-                  type="number"
-                  min="1"
-                  value={number}
-                  onChange={(e) => setNumber(e.target.value)}
-                  required
-                  className={inputClass} />
+                <input id="ep-number" type="number" min="1" value={number} onChange={e => setNumber(e.target.value)} required className={inputClass} />
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="ep-title" className={labelClass}>Episode title (hiari)</label>
-                <input
-                  id="ep-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ndoto Mbaya"
-                  className={inputClass} />
+                <input id="ep-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Ndoto Mbaya" className={inputClass} />
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="ep-youtube" className={labelClass}>YouTube Video ID (hiari)</label>
                 <input
                   id="ep-youtube"
                   value={youtubeVideoId}
-                  onChange={(e) => setYoutubeVideoId(extractYoutubeId(e.target.value))}
+                  onChange={e => setYoutubeVideoId(extractYoutubeId(e.target.value))}
                   placeholder="e.g. dQw4w9WgXcQ au https://youtu.be/..."
                   className={inputClass} />
                 <p className="mt-1 text-xs text-zinc-500">Weka ID au URL kamili ya YouTube — itachanganuliwa kiotomatiki.</p>
@@ -158,10 +157,7 @@ export function AdminCreateEpisode() {
             <div className="border-b border-zinc-800 px-3 py-2">
               <div className="flex flex-wrap gap-1">
                 {[BoldIcon, ItalicIcon, QuoteIcon, ListIcon, Undo2Icon, Redo2Icon].map((Icon, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className="grid h-8 w-8 place-items-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">
+                  <button key={i} type="button" className="grid h-8 w-8 place-items-center rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">
                     <Icon className="h-4 w-4" />
                   </button>
                 ))}
@@ -172,7 +168,7 @@ export function AdminCreateEpisode() {
                 id="ep-content"
                 rows={20}
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={e => setContent(e.target.value)}
                 required
                 className={cn(inputClass, 'resize-y font-read text-[15px] leading-[1.85] text-zinc-200')} />
             </div>
@@ -189,15 +185,11 @@ export function AdminCreateEpisode() {
               <div>
                 <span className={labelClass}>Access</span>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsFree(true)}
+                  <button type="button" onClick={() => setIsFree(true)}
                     className={cn('flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors', isFree ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100')}>
                     Free
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsFree(false)}
+                  <button type="button" onClick={() => setIsFree(false)}
                     className={cn('flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors', !isFree ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100')}>
                     Premium
                   </button>
@@ -205,11 +197,7 @@ export function AdminCreateEpisode() {
               </div>
               <div>
                 <label htmlFor="ep-status" className={labelClass}>Status</label>
-                <select
-                  id="ep-status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className={inputClass}>
+                <select id="ep-status" value={status} onChange={e => setStatus(e.target.value)} className={inputClass}>
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
                 </select>
@@ -221,7 +209,7 @@ export function AdminCreateEpisode() {
                   disabled={isSubmitting}
                   className="flex justify-center items-center gap-2 rounded-md bg-wine px-4 py-2.5 text-sm font-semibold text-cream hover:bg-wine-bright disabled:opacity-50">
                   {isSubmitting && <Loader2Icon className="h-4 w-4 animate-spin" />}
-                  Save Episode
+                  Update Episode
                 </button>
               </div>
             </div>

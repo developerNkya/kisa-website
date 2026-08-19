@@ -18,18 +18,19 @@ export function YouTubeEmbed({ videoId, title = 'Video ya Hadithi' }: YouTubeEmb
     >
       <div className="flex items-center gap-2 px-1">
         <span className="text-xs uppercase tracking-wider font-semibold text-wine-bright">
-          Tazama Video
+          Sikiliza
         </span>
         <div className="h-px flex-1 bg-line" />
       </div>
       
       <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-wine/30 bg-ink shadow-lg shadow-wine/5">
         <iframe
-          src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&iv_load_policy=3&fs=0&controls=1`}
+          src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&iv_load_policy=3&fs=1&controls=1`}
           title={title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
           className="absolute top-0 left-0 w-full h-full border-0"
-          sandbox="allow-same-origin allow-scripts allow-presentation"
+          sandbox="allow-same-origin allow-scripts allow-presentation allow-fullscreen"
         />
       </div>
     </motion.div>
