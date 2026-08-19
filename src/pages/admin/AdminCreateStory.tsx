@@ -23,6 +23,7 @@ export function AdminCreateStory() {
   const [description, setDescription] = useState('');
   const [authorId, setAuthorId] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [price, setPrice] = useState(1000);
   const [tags, setTags] = useState('');
   const [status, setStatus] = useState('draft');
   const [isOriginal, setIsOriginal] = useState(true);
@@ -68,7 +69,7 @@ export function AdminCreateStory() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !authorId || !categoryId) {
-      toast.error('Please fill required fields');
+      toast.error('Tafadhali jaza taarifa zote zinazohitajika');
       return;
     }
 
@@ -95,6 +96,7 @@ export function AdminCreateStory() {
         description,
         author_id: authorId,
         category_id: categoryId,
+        price: Number(price) || 0,
         tags: tagArray,
         status,
         is_featured: featured,
@@ -103,11 +105,11 @@ export function AdminCreateStory() {
       });
 
       if (error) throw error;
-      toast.success('Story created successfully');
+      toast.success('Hadithi imeundwa kikamilifu');
       navigate('/admin/stories');
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || 'Failed to create story');
+      toast.error(err.message || 'Hitilafu wakati wa kuunda hadithi');
     } finally {
       setIsSubmitting(false);
     }
@@ -121,7 +123,7 @@ export function AdminCreateStory() {
     <div className="space-y-5">
       <header>
         <h1 className="font-display text-2xl font-bold text-zinc-50">Create Story</h1>
-        <p className="mt-1 text-sm text-zinc-500">Ongeza hadithi mpya kwenye maktaba ya KISA.</p>
+        <p className="mt-1 text-sm text-zinc-500">Ongeza hadithi mpya na uweke bei yake ya kusoma.</p>
       </header>
 
       <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[1.5fr_1fr] xl:items-start">
@@ -157,7 +159,8 @@ export function AdminCreateStory() {
                   placeholder="Maelezo ya hadithi..."
                   className={cn(inputClass, 'resize-y leading-relaxed')} />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <label htmlFor="story-author" className={labelClass}>Author</label>
                   <select
@@ -184,7 +187,22 @@ export function AdminCreateStory() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label htmlFor="story-price" className={labelClass}>Bei ya Kitabu (TZS)</label>
+                  <input
+                    id="story-price"
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={price}
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                    placeholder="1000"
+                    required
+                    className={inputClass} />
+                  <p className="mt-1 text-[11px] text-zinc-500">Sehemu 3 za kwanza ni bure.</p>
+                </div>
               </div>
+
               <div>
                 <label htmlFor="story-tags" className={labelClass}>Tags (comma-separated)</label>
                 <input
@@ -285,7 +303,7 @@ export function AdminCreateStory() {
                 <p className="mt-2.5 font-display text-sm font-bold text-cream">
                   {title || 'Kichwa cha hadithi'}
                 </p>
-                <p className="text-xs text-mist">{categoryName} · 0 Sehemu</p>
+                <p className="text-xs text-mist">{categoryName} · TZS {price.toLocaleString()}</p>
               </div>
             </div>
           </AdminPanel>

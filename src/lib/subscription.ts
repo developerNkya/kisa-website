@@ -1,11 +1,26 @@
 import type { Subscription } from '../types/database';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-export const MONTHLY_PRICE_TZS = 2000;
-export const FREE_EPISODES_COUNT = 3; // first N episodes are always free
-export const PAYMENT_WINDOW_DAYS = 7; // show pay button N days before expiry
+export const DEFAULT_STORY_PRICE_TZS = 1000;
+export const FREE_EPISODES_COUNT = 3; // first 3 episodes are ALWAYS free
 
-// ── Subscription helpers ──────────────────────────────────────────────────────
+// ── Story Pay-Per-Book Paywall logic ──────────────────────────────────────────
+export function isStoryEpisodeLocked(
+  episodeNumber: number,
+  storyPrice: number = 0,
+  isPurchased: boolean = false
+): boolean {
+  if (episodeNumber <= FREE_EPISODES_COUNT) return false; // First 3 episodes always free
+  if (storyPrice <= 0) return false; // Free story
+  return !isPurchased; // Locked if paid story and user has not purchased
+}
+
+// ── Backward-compatible subscription helpers ─────────────────────────────────
+export function isEpisodeLocked(episodeNumber: number, isPremium: boolean): boolean {
+  if (episodeNumber <= FREE_EPISODES_COUNT) return false;
+  return !isPremium;
+}
+
 export function isSubscriptionValid(sub: Subscription | null): boolean {
   if (!sub) return false;
   return sub.status === 'active' && new Date(sub.expiry_date) >= new Date();
@@ -17,10 +32,10 @@ export function getDaysRemaining(expiryDate: string): number {
 }
 
 export function canInitiatePayment(sub: Subscription | null): boolean {
-  if (!sub) return true; // no subscription at all → show pay button
-  if (sub.status !== 'active') return true; // expired/cancelled → show pay
+  if (!sub) return true;
+  if (sub.status !== 'active') return true;
   const days = getDaysRemaining(sub.expiry_date);
-  return days <= PAYMENT_WINDOW_DAYS; // within payment window → show pay
+  return days <= 7;
 }
 
 export function formatSubscriptionStatus(sub: Subscription | null): string {
@@ -32,10 +47,4 @@ export function formatSubscriptionStatus(sub: Subscription | null): string {
   }
   if (sub.status === 'trial') return 'Majaribio';
   return 'Imekwisha';
-}
-
-// ── Episode paywall logic ─────────────────────────────────────────────────────
-export function isEpisodeLocked(episodeNumber: number, isPremium: boolean): boolean {
-  if (episodeNumber <= FREE_EPISODES_COUNT) return false; // always free
-  return !isPremium;
 }

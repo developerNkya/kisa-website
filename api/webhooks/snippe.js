@@ -23,6 +23,7 @@ module.exports = async function handler(req, res) {
     const reference = data?.metadata?.reference;
     const transactionId = data?.metadata?.transaction_id;
     const userId = data?.metadata?.user_id;
+    const storyId = data?.metadata?.story_id;
     const fallbackRef = data?.external_reference || data?.reference;
 
     if (
@@ -36,6 +37,52 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Missing reference' });
     }
 
+    // ── Handle Story Purchase ──────────────────────────────────
+    if (paymentType === 'story_purchase' || storyId) {
+      let query = supabaseAdmin.from('subscription_transactions').select('*');
+      if (transactionId) query = query.eq('id', transactionId);
+      else if (reference) query = query.eq('reference', reference);
+      else query = query.eq('reference', fallbackRef);
+
+      const { data: transaction, error: txError } = await query.single();
+      if (txError || !transaction) {
+        return res.status(404).json({ error: 'Story transaction not found' });
+      }
+
+      const targetStoryId = transaction.story_id || storyId;
+      const targetUserId = transaction.user_id || userId;
+      const targetAmount = transaction.amount || data?.metadata?.amount || 1000;
+
+      await supabaseAdmin
+        .from('subscription_transactions')
+        .update({
+          status: 'completed',
+          story_id: targetStoryId,
+          webhook_payload: data,
+        })
+        .eq('id', transaction.id);
+
+      if (targetStoryId && targetUserId) {
+        await supabaseAdmin
+          .from('story_purchases')
+          .upsert(
+            { user_id: targetUserId, story_id: targetStoryId, amount: targetAmount },
+            { onConflict: 'user_id,story_id' }
+          );
+      }
+
+      console.log(`✅ Story ${targetStoryId} successfully unlocked for user ${targetUserId}`);
+
+      return res.json({
+        received: true,
+        processed: true,
+        type: 'story_purchase',
+        story_id: targetStoryId,
+        status: 'unlocked',
+      });
+    }
+
+    // ── Handle Legacy Platform Subscription ─────────────────────
     if (paymentType === 'kisa_subscription') {
       let query = supabaseAdmin.from('subscription_transactions').select('*');
       if (transactionId) query = query.eq('id', transactionId);

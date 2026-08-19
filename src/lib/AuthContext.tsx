@@ -16,6 +16,8 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   subscription: Subscription | null;
+  purchasedStoryIds: string[];
+  hasPurchasedStory: (storyId: string) => boolean;
   isPremium: boolean;
   isAdmin: boolean;
   loading: boolean;
@@ -30,6 +32,7 @@ interface AuthState {
   // Data refresh
   refreshProfile: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
+  refreshPurchases: () => Promise<void>;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [purchasedStoryIds, setPurchasedStoryIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ── Fetch profile from DB ────────────────────────────────────
@@ -53,7 +57,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(data ?? null);
   }, []);
 
-  // ── Fetch active subscription ────────────────────────────────
+  // ── Fetch purchased stories ──────────────────────────────────
+  const fetchPurchases = useCallback(async (uid: string) => {
+    const { data } = await supabase
+      .from('story_purchases')
+      .select('story_id')
+      .eq('user_id', uid);
+    if (data) {
+      setPurchasedStoryIds(data.map((p: any) => p.story_id));
+    } else {
+      setPurchasedStoryIds([]);
+    }
+  }, []);
+
+  // ── Fetch active subscription (legacy support) ───────────────
   const fetchSubscription = useCallback(async (uid: string) => {
     const { data } = await supabase
       .from('subscriptions')
@@ -73,9 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        Promise.all([fetchProfile(s.user.id), fetchSubscription(s.user.id)]).finally(() =>
-          setLoading(false)
-        );
+        Promise.all([
+          fetchProfile(s.user.id),
+          fetchPurchases(s.user.id),
+          fetchSubscription(s.user.id)
+        ]).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -86,15 +105,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(s?.user ?? null);
       if (s?.user) {
         fetchProfile(s.user.id);
+        fetchPurchases(s.user.id);
         fetchSubscription(s.user.id);
       } else {
         setProfile(null);
+        setPurchasedStoryIds([]);
         setSubscription(null);
       }
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [fetchProfile, fetchSubscription]);
+  }, [fetchProfile, fetchPurchases, fetchSubscription]);
 
   // ── Login ────────────────────────────────────────────────────
   const login = useCallback(
@@ -137,9 +158,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) await fetchProfile(user.id);
   }, [user, fetchProfile]);
 
+  const refreshPurchases = useCallback(async () => {
+    if (user) await fetchPurchases(user.id);
+  }, [user, fetchPurchases]);
+
   const refreshSubscription = useCallback(async () => {
     if (user) await fetchSubscription(user.id);
   }, [user, fetchSubscription]);
+
+  // ── Check if story purchased ─────────────────────────────────
+  const hasPurchasedStory = useCallback((storyId: string): boolean => {
+    if (!storyId) return false;
+    return purchasedStoryIds.includes(storyId);
+  }, [purchasedStoryIds]);
 
   // ── Derived state ────────────────────────────────────────────
   const isPremium = useMemo(() => {
@@ -158,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       profile,
       subscription,
+      purchasedStoryIds,
+      hasPurchasedStory,
       isPremium,
       isAdmin,
       loading,
@@ -166,10 +199,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       refreshProfile,
       refreshSubscription,
+      refreshPurchases,
     }),
     [
-      session, user, profile, subscription, isPremium, isAdmin, loading,
-      login, register, logout, refreshProfile, refreshSubscription,
+      session, user, profile, subscription, purchasedStoryIds, hasPurchasedStory,
+      isPremium, isAdmin, loading, login, register, logout, refreshProfile,
+      refreshSubscription, refreshPurchases,
     ]
   );
 

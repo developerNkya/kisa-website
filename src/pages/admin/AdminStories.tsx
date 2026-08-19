@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { PlusIcon, Loader2Icon } from 'lucide-react';
-import { AdminPanel, AdminTable, RowActions, StatusPill, Td } from '../../components/admin/AdminTable';
+import { AdminPanel, AdminTable, StatusPill, Td } from '../../components/admin/AdminTable';
 import { compact } from '../../utils/format';
 import { cn } from '../../utils/cn';
 import { supabase } from '../../lib/supabase';
@@ -73,7 +73,8 @@ export function AdminStories() {
   const filtered = stories.filter(s => {
     if (filter !== 'All' && s.status !== filter.toLowerCase()) return false;
     if (searchTerm) {
-      return s.title.toLowerCase().includes(searchTerm.toLowerCase());
+      return s.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             s.authors?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     }
     return true;
   });
@@ -119,13 +120,13 @@ export function AdminStories() {
         ))}
       </div>
 
-      <AdminPanel title="All stories" description="Simamia hadithi, sehemu na hali ya kuchapishwa">
+      <AdminPanel title="All stories" description="Simamia hadithi, bei, sehemu na hali ya kuchapishwa">
         {loading ? (
           <div className="flex h-40 justify-center items-center">
             <Loader2Icon className="h-6 w-6 animate-spin text-wine" />
           </div>
         ) : (
-          <AdminTable columns={['Cover & Title', 'Author & Category', 'Episodes', 'Status', 'Views', 'Actions']}>
+          <AdminTable columns={['Cover & Title', 'Author & Category', 'Price', 'Episodes', 'Status', 'Views', 'Actions']}>
             {filtered.map((s) => (
               <tr key={s.id} className="hover:bg-zinc-900/50">
                 <Td>
@@ -142,6 +143,9 @@ export function AdminStories() {
                     <span className="text-xs text-zinc-500">{s.categories?.name}</span>
                   </div>
                 </Td>
+                <Td className="tabular-nums font-semibold text-gold">
+                  {s.price > 0 ? `TZS ${(s.price || 1000).toLocaleString()}` : 'Bure'}
+                </Td>
                 <Td className="tabular-nums">{s.episodes?.[0]?.count || 0}</Td>
                 <Td>
                   <StatusPill status={s.status.charAt(0).toUpperCase() + s.status.slice(1)} />
@@ -149,8 +153,7 @@ export function AdminStories() {
                 <Td className="tabular-nums">{compact(s.total_reads || 0)}</Td>
                 <Td>
                   <div className="flex flex-wrap gap-1.5">
-                    <Link to={`/story/${s.slug}`} target="_blank" className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">View</Link>
-                    <Link to={`/admin/stories/${s.id}/edit`} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">Edit</Link>
+                    <Link to={`/hadithi/${s.slug}`} target="_blank" className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">View</Link>
                     <button onClick={() => toggleStatus(s)} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">
                       {s.status === 'published' ? 'Unpublish' : 'Publish'}
                     </button>
@@ -160,7 +163,7 @@ export function AdminStories() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><Td colSpan={6} className="text-center py-4">No stories found</Td></tr>
+              <tr><Td colSpan={7} className="text-center py-4">No stories found</Td></tr>
             )}
           </AdminTable>
         )}

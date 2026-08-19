@@ -1,30 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookOpenIcon, ClockIcon, StarIcon } from 'lucide-react';
+import { BookOpenIcon, ClockIcon, StarIcon, CheckCircle2, ShoppingBag } from 'lucide-react';
 import { EpisodeList } from '../components/EpisodeList';
 import { StoryRail } from '../components/StoryRail';
-import { ButtonLink } from '../components/ui/Button';
+import { Button, ButtonLink } from '../components/ui/Button';
 import { BookmarkButton } from '../components/BookmarkButton';
 import { ShareButton } from '../components/ShareButton';
-import { FreeBadge, OriginalBadge, PremiumBadge } from '../components/ui/Badge';
+import { OriginalBadge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ErrorState } from '../components/states/ErrorState';
-import { SubscriptionCard } from '../components/SubscriptionCard';
 import { CommentsSection } from '../components/CommentsSection';
 import { RatingWidget } from '../components/RatingWidget';
+import { SubscriptionExpiredModal } from '../components/SubscriptionExpiredModal';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
 import { readingLabel, swahiliDate, totalMinutes, compact } from '../utils/format';
 
 export function StoryDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const { user, isPremium } = useAuth();
+  const { user, hasPurchasedStory } = useAuth();
   
   const [story, setStory] = useState<any>(null);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [related, setRelated] = useState<any[]>([]);
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -93,13 +94,18 @@ export function StoryDetail() {
     );
   }
 
+  const isPurchased = hasPurchasedStory(story.id);
+  const storyPrice = story.price ?? 1000;
+  const isPaidStory = storyPrice > 0;
+
   const minutes = totalMinutes(episodes.map((e) => e.reading_minutes || 5));
   const tags = story.tags || [];
 
   const info = [
     { label: 'Kundi', value: story.categories?.name || 'Hadithi' },
     { label: 'Mwandishi', value: story.authors?.name || 'Mwandishi wa KISA' },
-    { label: 'Sehemu', value: `${episodes.length}` },
+    { label: 'Bei', value: isPaidStory ? `TZS ${storyPrice.toLocaleString()}` : 'Bure' },
+    { label: 'Sehemu', value: `${episodes.length} (Sehemu 3 za kwanza ni Bure)` },
     { label: 'Hali', value: story.status === 'published' ? 'Imetolewa' : story.status },
     { label: 'Imetolewa', value: swahiliDate(story.created_at) },
     { label: 'Wasomaji', value: compact(story.total_reads || 0) }
@@ -112,7 +118,7 @@ export function StoryDetail() {
       number: e.episode_number,
       readingMinutes: e.reading_minutes || 5,
       publishedAt: e.published_at || e.created_at,
-      premium: e.episode_number > 3
+      premium: isPaidStory && !isPurchased && e.episode_number > 3
     }))
   };
 
@@ -145,7 +151,20 @@ export function StoryDetail() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 {story.is_original && <OriginalBadge />}
-                {isPremium ? <PremiumBadge /> : <FreeBadge />}
+                {!isPaidStory ? (
+                  <span className="rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-semibold px-3 py-1">
+                    Bure
+                  </span>
+                ) : isPurchased ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-semibold px-3 py-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Umeshanunua
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-gold/15 text-gold text-xs font-semibold px-3 py-1 border border-gold/30">
+                    TZS {storyPrice.toLocaleString()}
+                  </span>
+                )}
               </div>
 
               <h1 className="mt-3 font-display text-3xl font-black leading-[1.05] text-cream sm:text-5xl">
@@ -184,8 +203,21 @@ export function StoryDetail() {
                   to={`/soma/${story.slug}/1`}
                   size="lg"
                 >
-                  {progress ? 'Endelea Kusoma' : 'Soma Sehemu ya 1'}
+                  {progress ? 'Endelea Kusoma' : 'Soma Sehemu ya 1 (Bure)'}
                 </ButtonLink>
+
+                {isPaidStory && !isPurchased && (
+                  <Button
+                    onClick={() => setShowPurchaseModal(true)}
+                    variant="secondary"
+                    size="lg"
+                    className="border-gold/50 bg-gold/10 text-gold hover:bg-gold/20"
+                  >
+                    <ShoppingBag className="w-4 h-4 mr-2" />
+                    Nunua Hadithi Yote (TZS {storyPrice.toLocaleString()})
+                  </Button>
+                )}
+
                 <BookmarkButton storyId={story.id} storyTitle={story.title} />
                 <ShareButton
                   storyTitle={story.title}
@@ -248,13 +280,36 @@ export function StoryDetail() {
               </dl>
             </section>
 
-            {!isPremium && <SubscriptionCard headline="Soma sehemu zote za hadithi hii" />}
+            {isPaidStory && !isPurchased && (
+              <div className="rounded-2xl border border-gold/30 bg-[#171112] p-5 text-center">
+                <h3 className="font-display text-lg font-bold text-cream">Fungua Hadithi Hii</h3>
+                <p className="text-xs text-mist mt-1.5">
+                  Soma sehemu 3 za kwanza bure. Lipia TZS {storyPrice.toLocaleString()} kufungua hadithi yote milele.
+                </p>
+                <Button
+                  onClick={() => setShowPurchaseModal(true)}
+                  className="w-full mt-4 bg-wine hover:bg-wine-bright text-cream"
+                >
+                  Nunua Sasa — TZS {storyPrice.toLocaleString()}
+                </Button>
+              </div>
+            )}
           </aside>
         </div>
       </div>
 
       {related.length > 0 && (
         <StoryRail title="Hadithi zinazofanana" stories={related.map(s => ({...s, cover: s.cover_url}))} href="/hadithi" />
+      )}
+
+      {showPurchaseModal && (
+        <SubscriptionExpiredModal
+          storyId={story.id}
+          storyTitle={story.title}
+          price={storyPrice}
+          onClose={() => setShowPurchaseModal(false)}
+          onSuccess={() => setShowPurchaseModal(false)}
+        />
       )}
     </article>
   );

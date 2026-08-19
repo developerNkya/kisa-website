@@ -20,7 +20,7 @@ export function AdminPayments() {
     try {
       const { data, error } = await supabase
         .from('subscription_transactions')
-        .select('*, profiles(full_name, email)')
+        .select('*, profiles(full_name, email), stories(title)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -43,8 +43,8 @@ export function AdminPayments() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold text-zinc-50">Payments</h1>
-          <p className="mt-1 text-sm text-zinc-500">Miamala yote ya mfumo</p>
+          <h1 className="font-display text-2xl font-bold text-zinc-50">Payments & Book Sales</h1>
+          <p className="mt-1 text-sm text-zinc-500">Miamala na mauzo ya hadithi</p>
         </div>
         <div className="rounded-md border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-right">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Total Revenue</p>
@@ -52,13 +52,13 @@ export function AdminPayments() {
         </div>
       </header>
 
-      <AdminPanel title="All Transactions" description="Rekodi za malipo">
+      <AdminPanel title="All Transactions" description="Rekodi za malipo ya hadithi">
         {loading ? (
           <div className="flex h-40 justify-center items-center">
             <Loader2Icon className="h-6 w-6 animate-spin text-wine" />
           </div>
         ) : (
-          <AdminTable columns={['Reference', 'Customer', 'Method', 'Amount', 'Status', 'Date', 'Receipt']}>
+          <AdminTable columns={['Reference', 'Customer', 'Story / Item', 'Amount', 'Status', 'Date', 'Receipt']}>
             {transactions.map((t) => (
               <tr key={t.id} className="hover:bg-zinc-900/50">
                 <Td className="font-mono text-xs text-zinc-400">{t.reference}</Td>
@@ -66,8 +66,12 @@ export function AdminPayments() {
                   <div className="font-medium text-zinc-100">{t.profiles?.full_name || t.customer_name || 'Unknown'}</div>
                   <div className="text-xs text-zinc-500">{t.profiles?.email || t.customer_email || '-'}</div>
                 </Td>
-                <Td className="uppercase text-xs">{t.payment_method}</Td>
-                <Td className="tabular-nums font-medium text-zinc-200">TZS {(t.amount || 0).toLocaleString()}</Td>
+                <Td>
+                  <span className="font-medium text-zinc-200">
+                    {t.stories?.title || 'Hadithi ya KISA'}
+                  </span>
+                </Td>
+                <Td className="tabular-nums font-semibold text-gold">TZS {(t.amount || 0).toLocaleString()}</Td>
                 <Td>
                   <StatusPill status={t.status === 'completed' ? 'Successful' : t.status === 'pending' ? 'Pending' : 'Failed'} />
                 </Td>

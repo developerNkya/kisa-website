@@ -7,10 +7,15 @@ import { swahiliDate } from '../utils/format';
 import { cn } from '../utils/cn';
 
 export function EpisodeList({ story, initialCount = 8 }: { story: Story; initialCount?: number }) {
-  const { isPremium } = useAuth();
+  const { hasPurchasedStory } = useAuth();
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? story.episodes : story.episodes.slice(0, initialCount);
-  const canRead = (epNumber: number, premium: boolean) => epNumber <= 3 || !premium || isPremium;
+
+  const isPaidStory = (story.price ?? 1000) > 0;
+  const isPurchased = hasPurchasedStory(story.id);
+
+  // Episode is unlocked if: free episode (1–3), story has no price, or user purchased the story
+  const canRead = (epNumber: number) => epNumber <= 3 || !isPaidStory || isPurchased;
 
   return (
     <section aria-labelledby="episodes-heading">
@@ -23,9 +28,15 @@ export function EpisodeList({ story, initialCount = 8 }: { story: Story; initial
         </p>
       </div>
 
+      {isPaidStory && !isPurchased && (
+        <p className="mt-2 text-xs text-gold/80">
+          🔓 Sehemu 1–3 ni bure. Sehemu 4 na zaidi zinahitaji ununuzi wa TZS {(story.price || 1000).toLocaleString()}.
+        </p>
+      )}
+
       <ol className="mt-5 divide-y divide-line-soft overflow-hidden rounded-card border border-line-soft bg-surface">
         {visible.map((ep) => {
-          const unlocked = canRead(ep.number, ep.premium);
+          const unlocked = canRead(ep.number);
           return (
             <li key={ep.id}>
               <div
@@ -43,7 +54,7 @@ export function EpisodeList({ story, initialCount = 8 }: { story: Story; initial
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-cream">{ep.title}</p>
+                  <p className={cn('truncate font-semibold', unlocked ? 'text-cream' : 'text-mist/70')}>{ep.title}</p>
                   <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-mist">
                     <span className="inline-flex items-center gap-1">
                       <ClockIcon className="h-3 w-3" aria-hidden="true" />
@@ -58,16 +69,15 @@ export function EpisodeList({ story, initialCount = 8 }: { story: Story; initial
                     to={`/soma/${story.slug}/${ep.number}`}
                     className="shrink-0 rounded-full border border-line bg-surface-high px-4 py-2 text-[13px] font-semibold text-cream transition-colors duration-150 ease-kisa hover:border-gold/50 hover:text-gold"
                   >
-                    Soma
+                    {ep.number <= 3 ? 'Soma (Bure)' : 'Soma'}
                   </Link>
                 ) : (
-                  <Link
-                    to="/premium"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-4 py-2 text-[13px] font-semibold text-gold transition-colors duration-150 ease-kisa hover:bg-gold/20"
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-4 py-2 text-[13px] font-semibold text-gold/70"
                   >
                     <LockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                    Premium
-                  </Link>
+                    Nunua
+                  </span>
                 )}
               </div>
             </li>

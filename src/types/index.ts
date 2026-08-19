@@ -35,6 +35,7 @@ export interface Story {
   isNew: boolean;
   rating: number;
   reads: number;
+  price?: number;
   releasedAt: string;
   tags: string[];
   episodes: Episode[];

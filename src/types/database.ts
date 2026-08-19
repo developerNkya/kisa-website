@@ -61,6 +61,7 @@ export interface Database {
           is_original: boolean;
           avg_rating: number;
           total_reads: number;
+          price: number;
           tags: string[];
           created_at: string;
           updated_at: string;
@@ -86,6 +87,17 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['episodes']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['episodes']['Insert']>;
       };
+      story_purchases: {
+        Row: {
+          id: string;
+          user_id: string;
+          story_id: string;
+          amount: number;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['story_purchases']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['story_purchases']['Insert']>;
+      };
       subscriptions: {
         Row: {
           id: string;
@@ -105,6 +117,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          story_id: string | null;
           subscription_id: string | null;
           amount: number;
           payment_method: PaymentMethodType;
@@ -175,9 +188,10 @@ export interface Database {
     Functions: {
       kisa_is_admin: { Args: Record<never, never>; Returns: boolean };
       kisa_has_active_subscription: { Args: { p_user_id: string }; Returns: boolean };
+      kisa_has_purchased_story: { Args: { p_user_id: string; p_story_id: string }; Returns: boolean };
       kisa_increment_story_reads: { Args: { p_story_id: string }; Returns: void };
-      kisa_activate_subscription: {
-        Args: { p_user_id: string; p_transaction_id: string; p_reference: string };
+      kisa_unlock_story_purchase: {
+        Args: { p_user_id: string; p_story_id: string; p_transaction_id: string; p_amount: number };
         Returns: string;
       };
     };
@@ -190,6 +204,7 @@ export type Author = Database['public']['Tables']['authors']['Row'];
 export type Category = Database['public']['Tables']['categories']['Row'];
 export type Story = Database['public']['Tables']['stories']['Row'];
 export type Episode = Database['public']['Tables']['episodes']['Row'];
+export type StoryPurchase = Database['public']['Tables']['story_purchases']['Row'];
 export type Subscription = Database['public']['Tables']['subscriptions']['Row'];
 export type SubscriptionTransaction = Database['public']['Tables']['subscription_transactions']['Row'];
 export type ReadingProgress = Database['public']['Tables']['reading_progress']['Row'];

@@ -53,6 +53,7 @@ CREATE TABLE stories (
     avg_rating   NUMERIC(3,2) DEFAULT 0,
     total_reads  INTEGER DEFAULT 0,
     tags         TEXT[] DEFAULT '{}',
+    price        INTEGER NOT NULL DEFAULT 1000,
     created_at   TIMESTAMPTZ DEFAULT NOW(),
     updated_at   TIMESTAMPTZ DEFAULT NOW()
 );

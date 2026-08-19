@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightIcon, BellIcon, ClockIcon } from 'lucide-react';
+import { ArrowRightIcon, BellIcon, BookOpen, CheckCircle2, ClockIcon, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
-import { getDaysRemaining } from '../lib/subscription';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ButtonLink } from '../components/ui/Button';
 import { StoryGrid } from '../components/StoryGrid';
 import { EmptyState } from '../components/states/EmptyState';
-import { StatusDot } from '../components/ui/Badge';
-import { notifications } from '../data/notifications'; // Keep static notifications for now
+import { notifications } from '../data/notifications';
 
 export function Dashboard() {
-  const { user, profile, subscription, isPremium } = useAuth();
+  const { user, profile } = useAuth();
   
   const [continueItems, setContinueItems] = useState<any[]>([]);
+  const [purchasedStories, setPurchasedStories] = useState<any[]>([]);
   const [savedStories, setSavedStories] = useState<any[]>([]);
   const [historyStories, setHistoryStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,18 +23,35 @@ export function Dashboard() {
       if (!user) return;
       setLoading(true);
       try {
-        // Fetch Reading Progress with stories
+        // 1. Fetch Purchased Stories
+        const { data: purchasesData } = await supabase
+          .from('story_purchases')
+          .select('*, stories(*, authors(*), categories(*))')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (purchasesData) {
+          const list = purchasesData
+            .filter((p: any) => p.stories)
+            .map((p: any) => ({
+              ...p.stories,
+              cover: p.stories.cover_url || '/covers/default.jpg',
+              genres: p.stories.categories?.name ? [p.stories.categories.name] : (p.stories.tags || ['Hadithi']),
+            }));
+          setPurchasedStories(list);
+        }
+
+        // 2. Fetch Reading Progress with stories
         const { data: progressData } = await supabase
           .from('reading_progress')
           .select('*, stories(*)')
           .eq('user_id', user.id)
-          .order('last_read_at', { ascending: false })
+          .order('updated_at', { ascending: false })
           .limit(5);
 
         if (progressData) {
           setContinueItems(progressData.filter((p: any) => p.stories));
           
-          // History could be just recent progress (distinct stories)
           const history = progressData.filter((p: any) => p.stories).map((p: any) => ({
             ...p.stories,
             cover: p.stories.cover_url
@@ -43,7 +59,7 @@ export function Dashboard() {
           setHistoryStories(history);
         }
 
-        // Fetch Saved (Bookmarks)
+        // 3. Fetch Saved (Bookmarks)
         const { data: savedData } = await supabase
           .from('bookmarks')
           .select('*, stories(*)')
@@ -71,7 +87,7 @@ export function Dashboard() {
       <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
         <EmptyState
           title="Ingia kwenye akaunti yako"
-          body="Ingia ili kuona hadithi zako, ulipoishia, na hali ya usajili wako."
+          body="Ingia ili kuona hadithi zako ulizonunua na ulipoishia kusoma."
           ctaLabel="Ingia"
           ctaHref="/ingia"
         />
@@ -79,7 +95,6 @@ export function Dashboard() {
     );
   }
 
-  const daysLeft = getDaysRemaining(subscription as any);
   const fullName = profile?.full_name || user.email?.split('@')[0] || 'Msomaji';
 
   return (
@@ -89,7 +104,7 @@ export function Dashboard() {
           <h1 className="font-display text-3xl font-black text-cream sm:text-[40px]">
             Karibu, {fullName} 👋
           </h1>
-          <p className="mt-2 text-sm text-mist">Hadithi zako, ulipoishia, na usajili wako.</p>
+          <p className="mt-2 text-sm text-mist">Hadithi zako, ulizonunua, na ulipoishia.</p>
         </div>
         <ButtonLink to="/hadithi" variant="secondary">
           Gundua hadithi mpya
@@ -98,6 +113,39 @@ export function Dashboard() {
 
       <div className="mt-9 grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
         <div className="space-y-12">
+          {/* Purchased Stories Section */}
+          <section aria-labelledby="dash-purchases">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="dash-purchases" className="font-display text-xl font-bold text-cream flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-gold" />
+                Hadithi Ulizonunua ({purchasedStories.length})
+              </h2>
+              {purchasedStories.length > 0 && (
+                <span className="text-xs text-gold">Zimefunguliwa zote</span>
+              )}
+            </div>
+
+            <div className="mt-5">
+              {loading ? (
+                <div className="text-mist">Inapakia hadithi...</div>
+              ) : purchasedStories.length === 0 ? (
+                <div className="rounded-2xl border border-line-soft bg-surface p-6 text-center">
+                  <BookOpen className="w-8 h-8 text-mist mx-auto mb-2 opacity-50" />
+                  <p className="font-semibold text-cream text-base">Bado hujanunua hadithi yoyote.</p>
+                  <p className="text-mist text-xs mt-1 max-w-sm mx-auto">
+                    Kila hadithi unaweza kusoma sehemu 3 za kwanza bure, kisha ukanunua ili kufungua sehemu zote zilizobaki.
+                  </p>
+                  <ButtonLink to="/hadithi" className="mt-4" size="sm">
+                    Gundua Hadithi
+                  </ButtonLink>
+                </div>
+              ) : (
+                <StoryGrid stories={purchasedStories} showDescription={false} />
+              )}
+            </div>
+          </section>
+
+          {/* Continue Reading Section */}
           <section aria-labelledby="dash-continue">
             <h2 id="dash-continue" className="font-display text-xl font-bold text-cream">
               Endelea Kusoma
@@ -126,14 +174,14 @@ export function Dashboard() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-display text-base font-bold text-cream">{p.stories.title}</p>
                       <p className="mt-0.5 text-xs text-mist">
-                        Sehemu ya {p.episode_number} · {p.percent}%
+                        {p.percent}% Imesomwa
                       </p>
                       <div className="mt-2.5 max-w-xs">
                         <ProgressBar percent={p.percent} label={`Maendeleo ya ${p.stories.title}`} />
                       </div>
                     </div>
                     <Link
-                      to={`/soma/${p.stories.slug}/${p.episode_number}`}
+                      to={`/soma/${p.stories.slug}/1`}
                       className="shrink-0 rounded-full bg-wine px-5 py-2.5 text-[13px] font-semibold text-cream transition-colors duration-150 ease-kisa hover:bg-wine-bright"
                     >
                       Endelea
@@ -144,6 +192,7 @@ export function Dashboard() {
             )}
           </section>
 
+          {/* Bookmarks Section */}
           <section aria-labelledby="dash-saved">
             <div className="flex items-center justify-between gap-4">
               <h2 id="dash-saved" className="font-display text-xl font-bold text-cream">
@@ -169,6 +218,7 @@ export function Dashboard() {
             </div>
           </section>
 
+          {/* History Section */}
           <section aria-labelledby="dash-history">
             <h2 id="dash-history" className="font-display text-xl font-bold text-cream">
               Historia
@@ -209,29 +259,26 @@ export function Dashboard() {
         </div>
 
         <aside className="space-y-5">
+          {/* Summary Card */}
           <section
             aria-labelledby="dash-sub"
             className="rounded-card border border-gold/25 bg-[#171112] p-5"
           >
             <h2 id="dash-sub" className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">
-              Usajili wako
+              Akaunti Yako ya KISA
             </h2>
-            <p className="mt-2 font-display text-xl font-bold text-cream">KISA Premium</p>
-            <div className="mt-3">
-              <StatusDot tone={isPremium ? 'green' : 'red'} label={isPremium ? 'Active' : 'Imeisha'} />
+            <p className="mt-2 font-display text-xl font-bold text-cream">{fullName}</p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-semibold px-3 py-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {purchasedStories.length} Hadithi Ulizonunua
+              </span>
             </div>
-            {isPremium ? (
-              <>
-                <p className="mt-3 text-sm text-mist">Una siku {daysLeft} zilizobaki.</p>
-                <div className="mt-3">
-                  <ProgressBar percent={Math.min(100, Math.max(0, (daysLeft / 30) * 100))} tone="gold" label="Siku zilizobaki" />
-                </div>
-              </>
-            ) : (
-              <p className="mt-3 text-sm text-mist">Usajili wako umeisha. Ongeza muda ili kuendelea.</p>
-            )}
-            <ButtonLink to="/premium" className="mt-5 w-full" variant={isPremium && daysLeft > 7 ? 'secondary' : 'primary'}>
-              {isPremium ? 'Ongeza muda' : 'Jiunge KISA Premium'}
+            <p className="mt-3 text-xs text-mist">
+              Sehemu 3 za kwanza za kila hadithi ni bure. Hadithi unazonunua zinabaki zako milele.
+            </p>
+            <ButtonLink to="/hadithi" className="mt-5 w-full">
+              Soma Hadithi
             </ButtonLink>
           </section>
 

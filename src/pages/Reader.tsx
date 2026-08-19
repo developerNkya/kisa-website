@@ -16,7 +16,7 @@ export function Reader() {
   const { slug, episode } = useParams();
   const navigate = useNavigate();
   const { readerPrefs, setReaderPrefs } = useKisa();
-  const { user, isPremium } = useAuth();
+  const { user, hasPurchasedStory } = useAuth();
   
   const [story, setStory] = useState<any>(null);
   const [ep, setEp] = useState<any>(null);
@@ -64,8 +64,12 @@ export function Reader() {
         
         setNextEpExists(!!nextData);
 
-        // Paywall logic: > 3 AND !isPremium
-        if (epData.episode_number > 3 && !isPremium) {
+        // Paywall logic: First 3 episodes free. For episode 4+:
+        // Free if story price is 0, or user has purchased the story.
+        const isPaidStory = (storyData.price ?? 1000) > 0;
+        const isUnlocked = epData.episode_number <= 3 || !isPaidStory || hasPurchasedStory(storyData.id);
+        
+        if (!isUnlocked) {
           setShowPaywall(true);
         } else {
           setShowPaywall(false);
@@ -77,7 +81,7 @@ export function Reader() {
       }
     }
     loadData();
-  }, [slug, epNumber, isPremium]);
+  }, [slug, epNumber, hasPurchasedStory]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -100,7 +104,6 @@ export function Reader() {
   useEffect(() => {
     if (!story || !ep || !user) return;
     return () => {
-      // Save reading progress on unmount
       const pct = Math.max(5, Math.round(percentRef.current));
       supabase.from('reading_progress').upsert({
         user_id: user.id,
@@ -189,7 +192,7 @@ export function Reader() {
           )}
         >
           <p className={cn('text-[11px] font-bold uppercase tracking-[0.2em]', light ? 'text-wine' : 'text-gold')}>
-            {(story.genres || []).join(' · ')}
+            {(story.tags || []).join(' · ')}
           </p>
           <h1 className="mt-3 font-display text-[30px] font-black uppercase leading-[1.08] tracking-wide sm:text-[40px]">
             {story.title}
@@ -233,10 +236,13 @@ export function Reader() {
 
           {showPaywall ? (
             <div className="mt-10">
-            <SubscriptionExpiredModal
-              onSubscribe={() => { window.location.href = '/premium'; }}
-              onClose={() => navigate(`/hadithi/${story.slug}`)}
-            />
+              <SubscriptionExpiredModal
+                storyId={story.id}
+                storyTitle={story.title}
+                price={story.price || 1000}
+                onClose={() => navigate(`/hadithi/${story.slug}`)}
+                onSuccess={() => setShowPaywall(false)}
+              />
             </div>
           ) : (
             <>

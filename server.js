@@ -11,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // API Routes
+app.post('/api/story/pay', require('./api/subscription/pay.js'));
 app.post('/api/subscription/pay', require('./api/subscription/pay.js'));
 app.post('/api/webhooks/snippe', require('./api/webhooks/snippe.js'));
 

@@ -1,8 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 
-const PRICE_FLAT = 2000;
-
 module.exports = async function handler(req, res) {
   const supabaseAdmin = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
@@ -16,44 +14,58 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { userId, paymentMethod, customer, mobileNetwork } = req.body;
+    const { userId, storyId, paymentMethod = 'mobile', customer, mobileNetwork } = req.body;
 
-    if (!userId || !paymentMethod || !customer) {
+    if (!userId || !customer) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    const amount = PRICE_FLAT;
-    const reference = `KSB-${userId.slice(0, 8)}-${Date.now()}`;
+    let amount = 2000;
+    let storyTitle = 'KISA Story';
 
-    const { data: activeSub } = await supabaseAdmin
-      .from('subscriptions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .maybeSingle();
+    // If purchasing a specific story, fetch the story price and title
+    if (storyId) {
+      const { data: story, error: storyError } = await supabaseAdmin
+        .from('stories')
+        .select('id, title, price')
+        .eq('id', storyId)
+        .single();
+
+      if (storyError || !story) {
+        return res.status(404).json({ success: false, error: 'Story not found' });
+      }
+
+      amount = story.price || 1000;
+      storyTitle = story.title;
+    }
+
+    const reference = storyId 
+      ? `KSP-${storyId.slice(0, 4)}-${userId.slice(0, 4)}-${Date.now()}`
+      : `KSB-${userId.slice(0, 8)}-${Date.now()}`;
 
     const { data: transaction, error: txError } = await supabaseAdmin
       .from('subscription_transactions')
       .insert({
         user_id: userId,
-        subscription_id: activeSub?.id || null,
+        story_id: storyId || null,
         amount,
         payment_method: paymentMethod,
         status: 'pending',
         reference,
-        customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
-        customer_phone: customer.phone_number,
+        customer_name: `${customer.firstname || customer.fullName || ''} ${customer.lastname || ''}`.trim() || 'Msomaji wa KISA',
+        customer_phone: customer.phone_number || customer.phone,
         customer_email: customer.email,
       })
       .select()
       .single();
 
     if (txError) {
-      console.error('Subscription transaction error:', txError);
+      console.error('Payment transaction insert error:', txError);
       return res.status(500).json({ success: false, error: 'Failed to create transaction' });
     }
 
-    let phoneNumber = String(customer.phone_number).replace(/^\+/, '').replace(/\D/g, '');
+    let rawPhone = customer.phone_number || customer.phone || '';
+    let phoneNumber = String(rawPhone).replace(/^\+/, '').replace(/\D/g, '');
     if (phoneNumber.startsWith('0')) phoneNumber = '255' + phoneNumber.substring(1);
 
     let paymentUrl = null;
@@ -71,14 +83,20 @@ module.exports = async function handler(req, res) {
         webhook_url: webhookUrl,
         external_reference: reference,
         phone_number: phoneNumber,
-        details: { amount, currency: 'TZS' },
+        details: { 
+          amount, 
+          currency: 'TZS',
+          description: `Malipo ya hadithi: ${storyTitle}`
+        },
         customer: {
-          firstname: customer.firstname.trim(),
-          lastname: customer.lastname.trim(),
-          email: customer.email.trim(),
+          firstname: (customer.firstname || customer.fullName || 'Msomaji').trim(),
+          lastname: (customer.lastname || '').trim(),
+          email: (customer.email || 'reader@kisa.co.tz').trim(),
         },
         metadata: {
-          type: 'kisa_subscription',
+          type: storyId ? 'story_purchase' : 'kisa_subscription',
+          story_id: storyId || null,
+          story_title: storyTitle,
           user_id: userId,
           reference,
           transaction_id: transaction.id,
@@ -92,7 +110,7 @@ module.exports = async function handler(req, res) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${snippeKey}`,
-          'Idempotency-Key': `sub-${reference}`,
+          'Idempotency-Key': `pay-${reference}`,
         },
         timeout: 30000,
       });
@@ -102,9 +120,9 @@ module.exports = async function handler(req, res) {
       const snippeReference = snippeResponse.data?.data?.reference || null;
       if (snippeReference) {
         await supabaseAdmin
-            .from('subscription_transactions')
-            .update({ snippe_reference: snippeReference })
-            .eq('id', transaction.id);
+          .from('subscription_transactions')
+          .update({ snippe_reference: snippeReference })
+          .eq('id', transaction.id);
       }
     }
 
@@ -121,13 +139,14 @@ module.exports = async function handler(req, res) {
       transaction_id: transaction.id,
       payment_url: paymentUrl,
       amount,
+      story_title: storyTitle,
       message:
         paymentMethod === 'mobile'
-          ? 'Payment request sent to your phone'
-          : 'Redirect to payment page',
+          ? `Ombi la malipo ya TZS ${amount.toLocaleString()} limetumwa kwenye simu yako`
+          : 'Elekezwa kwenye ukurasa wa malipo',
     });
   } catch (error) {
-    console.error('Subscription pay error:', error);
+    console.error('Story pay error:', error);
     return res.status(500).json({
       success: false,
       error: error.response?.data?.message || error.message || 'Payment initiation failed',
