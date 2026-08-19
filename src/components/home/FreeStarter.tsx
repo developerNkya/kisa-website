@@ -59,11 +59,11 @@ export function FreeStarter() {
           <div>
             <p className="font-display text-xl font-bold text-cream sm:text-2xl">Umeipenda?</p>
             <p className="mt-1 text-sm text-mist">
-              Fungua hadithi zote kwa <span className="font-semibold text-gold">TZS 2,000/mwezi</span>.
+              Soma sehemu 3 za kwanza za kila hadithi <span className="font-semibold text-gold">bure</span>, kisha lipia mara moja tu kupata hadithi yote milele.
             </p>
           </div>
-          <ButtonLink to="/premium" size="lg" className="w-full sm:w-auto">
-            Jisajili sasa
+          <ButtonLink to="/hadithi" size="lg" className="w-full sm:w-auto">
+            Gundua Hadithi
           </ButtonLink>
         </div>
       </div>

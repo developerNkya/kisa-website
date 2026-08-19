@@ -16,8 +16,6 @@ import { Categories } from './pages/Categories';
 import { Category } from './pages/Category';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { Subscribe } from './pages/Subscribe';
-import { Payment } from './pages/Payment';
 import { Dashboard } from './pages/Dashboard';
 import { Profile } from './pages/Profile';
 import { Saved } from './pages/Saved';
@@ -77,8 +75,8 @@ export function App() {
               <Route path="/wasifu" element={
                 <ProtectedRoute><Profile /></ProtectedRoute>
               } />
-              <Route path="/premium" element={<Subscribe />} />
-              <Route path="/malipo" element={<Payment />} />
+              <Route path="/premium" element={<Navigate to="/hadithi" replace />} />
+              <Route path="/malipo" element={<Navigate to="/hadithi" replace />} />
               <Route path="/karibu" element={<Landing />} />
               <Route path="*" element={<NotFound />} />
             </Route>

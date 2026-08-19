@@ -17,8 +17,7 @@ const columns = [
   links: [
   { label: 'Ingia', to: '/ingia' },
   { label: 'Jisajili', to: '/jisajili' },
-  { label: 'KISA Premium', to: '/premium' },
-  { label: 'Malipo', to: '/malipo' }]
+  { label: 'Akaunti Yangu', to: '/akaunti' }]
 
 },
 {
@@ -83,7 +82,7 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col gap-3 border-t border-line-soft pt-6 text-xs text-dust sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 KISA Media, Dar es Salaam. Haki zote zimehifadhiwa.</p>
-          <p>KISA Premium — TZS 2,000 / mwezi</p>
+          <p>Hadithi za Kubuni za Kiswahili</p>
         </div>
       </div>
     </footer>);

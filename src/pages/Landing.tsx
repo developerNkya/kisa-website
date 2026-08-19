@@ -44,7 +44,7 @@ export function Landing() {
             </div>
 
             <ul className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[13px] text-cream/80">
-              {['Sehemu za kwanza ni bure', 'TZS 2,000/mwezi kwa zote', 'Inafanya kazi kwa simu yako'].map(
+              {['Sehemu 3 za kwanza ni bure', 'Lipia mara moja tu kwa kila kitabu', 'Inafanya kazi kwa simu yako'].map(
                 (t) =>
                 <li key={t} className="inline-flex items-center gap-1.5">
                     <CheckIcon className="h-3.5 w-3.5 text-gold" aria-hidden="true" />
@@ -72,8 +72,8 @@ export function Landing() {
           },
           {
             icon: CheckIcon,
-            title: 'TZS 2,000 tu',
-            body: 'Hadithi zote za Premium na KISA Originals kwa mwezi mzima.'
+            title: 'Malipo ya mara moja',
+            body: 'Hakuna usajili wa kila mwezi. Lipia hadithi unayoipenda tu na ibaki yako milele.'
           }].
           map((f) =>
           <div key={f.title}>
@@ -98,21 +98,15 @@ export function Landing() {
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 lg:px-10">
           <div className="flex flex-col items-start gap-5 rounded-2xl border border-gold/25 bg-[#171112] px-6 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-10">
             <div>
-              <p className="font-display text-2xl font-black text-cream">TZS 2,000 tu kwa mwezi.</p>
+              <p className="font-display text-2xl font-black text-cream">Gundua Hadithi Mpya</p>
               <p className="mt-1.5 text-sm text-mist">
-                Hadithi {stories.length}+, sehemu mpya kila wiki, sitisha wakati wowote.
+                Anza kusoma sehemu 3 za kwanza za kila hadithi bure kabisa sasa.
               </p>
             </div>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <ButtonLink to="/premium" size="lg">
-                Jisajili sasa
+              <ButtonLink to="/hadithi" size="lg">
+                Anza Kusoma Bure
               </ButtonLink>
-              <Link
-                to="/hadithi"
-                className="inline-flex h-12 items-center justify-center rounded-full px-5 text-sm font-semibold text-mist transition-colors duration-150 ease-kisa hover:text-cream">
-                
-                Soma bure kwanza
-              </Link>
             </div>
           </div>
         </div>

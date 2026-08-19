@@ -46,7 +46,7 @@ export function AuthShell({
             “Hadithi zinazokufanya urudi.”
           </p>
           <p className="mt-3 max-w-sm text-sm text-mist">
-            Hadithi mpya za Kiswahili, sehemu baada ya sehemu — kwa TZS 2,000 kwa mwezi.
+            Hadithi mpya za Kiswahili, sehemu baada ya sehemu.
           </p>
         </div>
       </div>
