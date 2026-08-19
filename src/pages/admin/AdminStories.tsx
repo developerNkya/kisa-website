@@ -154,6 +154,7 @@ export function AdminStories() {
                 <Td>
                   <div className="flex flex-wrap gap-1.5">
                     <Link to={`/hadithi/${s.slug}`} target="_blank" className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">View</Link>
+                    <Link to={`/admin/stories/${s.id}/edit`} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">Edit</Link>
                     <button onClick={() => toggleStatus(s)} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">
                       {s.status === 'published' ? 'Unpublish' : 'Publish'}
                     </button>

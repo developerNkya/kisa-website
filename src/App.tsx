@@ -26,6 +26,7 @@ import { NotFound } from './pages/NotFound';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminStories } from './pages/admin/AdminStories';
 import { AdminCreateStory } from './pages/admin/AdminCreateStory';
+import { AdminEditStory } from './pages/admin/AdminEditStory';
 import { AdminEpisodes } from './pages/admin/AdminEpisodes';
 import { AdminCreateEpisode } from './pages/admin/AdminCreateEpisode';
 import { AdminAuthors } from './pages/admin/AdminAuthors';
@@ -91,6 +92,7 @@ export function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="stories" element={<AdminStories />} />
               <Route path="stories/new" element={<AdminCreateStory />} />
+              <Route path="stories/:id/edit" element={<AdminEditStory />} />
               <Route path="episodes" element={<AdminEpisodes />} />
               <Route path="episodes/new" element={<AdminCreateEpisode />} />
               <Route path="authors" element={<AdminAuthors />} />
