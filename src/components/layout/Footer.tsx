@@ -36,14 +36,14 @@ export function Footer() {
           <div>
             <span className="font-display text-2xl font-black tracking-[0.14em] text-[#9B1B3B]">KISA</span>
             <p className="mt-3 max-w-xs font-display text-base italic text-gray-500">
-              Hadithi zinazokufanya urudi.
+            Hadithi zenye mafundisho,visa, maadili, na burudani.
             </p>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-gray-500">
-              Hadithi za kubuni za Kiswahili, sehemu baada ya sehemu. Imeundwa Tanzania, kwa wasomaji wa Afrika Mashariki.
+              Za Kiswahili, zimeundwa Tanzania. Kwa wasomaji duniani kote.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          {/* <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
             {columns.map((col) => (
               <div key={col.title}>
                 <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">
@@ -63,12 +63,12 @@ export function Footer() {
                 </ul>
               </div>
             ))}
-          </div>
+          </div> */}
         </div>
 
         <div className="mt-12 flex flex-col gap-3 border-t border-gray-100 pt-6 text-xs text-gray-400 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 KISA Media, Dar es Salaam. Haki zote zimehifadhiwa.</p>
-          <p>Hadithi za Kubuni za Kiswahili</p>
+          <p>Hadithi Nzuri Za Kiswahili</p>
         </div>
       </div>
     </footer>

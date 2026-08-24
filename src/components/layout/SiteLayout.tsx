@@ -18,7 +18,7 @@ export function SiteLayout() {
         <Outlet />
       </main>
       <Footer />
-      <MobileBottomNav />
+      {/* <MobileBottomNav /> */}
     </div>);
 
 }
