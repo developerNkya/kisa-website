@@ -154,7 +154,7 @@ export function EpisodeList({ story, initialCount = 8, onEpisodeClick }: Episode
                       status.className
                     )}>
                       {status.icon}
-                      Nunua
+                      
                     </span>
                   )}
                 </div>

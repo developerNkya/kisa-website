@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookOpenIcon, ClockIcon, StarIcon, LockIcon, UnlockIcon } from 'lucide-react';
+import { BookOpenIcon, ClockIcon, StarIcon, LockIcon, UnlockIcon, Eye } from 'lucide-react';
 import { EpisodeList } from '../components/EpisodeList';
 import { StoryRail } from '../components/StoryRail';
 import { ButtonLink } from '../components/ui/Button';
@@ -9,9 +9,9 @@ import { CommentsSection } from '../components/CommentsSection';
 import { RatingWidget } from '../components/RatingWidget';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
-import { readingLabel, totalMinutes } from '../utils/format';
+import { readingLabel, totalMinutes, compact } from '../utils/format';
 import { SubscriptionExpiredModal } from '../components/SubscriptionExpiredModal';
-import { track } from '../lib/pixel'; // ✅ Add this import
+import { track } from '../lib/pixel';
 
 export function StoryDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -20,6 +20,7 @@ export function StoryDetail() {
   const [story, setStory] = useState<any>(null);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [related, setRelated] = useState<any[]>([]);
+  const [similarStories, setSimilarStories] = useState<any[]>([]);
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
@@ -48,16 +49,28 @@ export function StoryDetail() {
           if (epData) setEpisodes(epData);
           
           if (user) {
+            // ✅ Fetch reading progress with episode details
             const { data: progData } = await supabase
               .from('reading_progress')
-              .select('*')
+              .select(`
+                *,
+                episodes (episode_number, title)
+              `)
               .eq('user_id', user.id)
               .eq('story_id', storyData.id)
               .maybeSingle();
-            if (progData) setProgress(progData);
+            
+            if (progData) {
+              // ✅ Ensure episode_number is available
+              const progressWithEpisode = {
+                ...progData,
+                episode_number: progData.episodes?.episode_number || progData.episode_number || 1
+              };
+              setProgress(progressWithEpisode);
+            }
           }
           
-          // Related stories based on category
+          // Related stories based on category (only used for StoryRail - keeping for now but not used)
           if (storyData.category_id) {
             const { data: relData } = await supabase
               .from('stories')
@@ -67,6 +80,18 @@ export function StoryDetail() {
               .limit(6);
             if (relData) setRelated(relData);
           }
+
+          // Load similar stories (new horizontal scroll section)
+          const { data: similarData } = await supabase
+            .from('stories')
+            .select('id, slug, title, cover_url, hook, price, total_reads, authors(name)')
+            .eq('status', 'published')
+            .eq('category_id', storyData.category_id)
+            .neq('id', storyData.id)
+            .order('total_reads', { ascending: false })
+            .limit(10);
+          
+          if (similarData) setSimilarStories(similarData);
         }
       } catch (e) {
         console.error(e);
@@ -86,6 +111,57 @@ export function StoryDetail() {
         price: story.price || 1000,
         category: story.categories?.name,
       });
+    }
+  }, [story]);
+
+  // ✅ Increment total_reads when story is viewed
+  useEffect(() => {
+    if (story) {
+      // Check if already counted this session
+      const viewedKey = `viewed_${story.id}`;
+      if (sessionStorage.getItem(viewedKey)) {
+        console.log('📊 Views already counted for this session');
+        return;
+      }
+      
+      // Increment total_reads
+      const incrementReads = async () => {
+        try {
+          // Get current total_reads
+          const { data } = await supabase
+            .from('stories')
+            .select('total_reads')
+            .eq('id', story.id)
+            .single();
+          
+          if (data) {
+            const currentReads = data.total_reads || 0;
+            const newReads = currentReads + 1;
+            
+            const { error } = await supabase
+              .from('stories')
+              .update({ total_reads: newReads })
+              .eq('id', story.id);
+            
+            if (error) {
+              console.error('Error updating total_reads:', error);
+            } else {
+              // Mark as viewed in this session
+              sessionStorage.setItem(viewedKey, 'true');
+              // Update local state to reflect new count
+              setStory((prev: any) => ({
+                ...prev,
+                total_reads: newReads
+              }));
+              console.log('📊 Total reads incremented to:', newReads);
+            }
+          }
+        } catch (err) {
+          console.error('Error incrementing reads:', err);
+        }
+      };
+      
+      incrementReads();
     }
   }, [story]);
 
@@ -125,19 +201,22 @@ export function StoryDetail() {
   const getStartEpisode = () => {
     // If user has progress, try to continue from there
     if (progress) {
-      const nextEp = progress.episode_number + 1;
+      // ✅ Get the episode number from progress (with fallback)
+      const currentEpisode = progress.episode_number || 1;
+      const nextEp = currentEpisode + 1;
+      
       // If next episode is locked, find the last unlocked episode
       if (!canAccessEpisode(nextEp)) {
         // Find the highest unlocked episode they've read
         for (let i = episodes.length - 1; i >= 0; i--) {
           const ep = episodes[i];
-          if (ep.episode_number <= progress.episode_number && 
+          if (ep.episode_number <= currentEpisode && 
               canAccessEpisode(ep.episode_number)) {
             return ep.episode_number;
           }
         }
       }
-      return nextEp <= episodes.length ? nextEp : progress.episode_number;
+      return nextEp <= episodes.length ? nextEp : currentEpisode;
     }
     
     // No progress, start from first unlocked episode
@@ -187,7 +266,7 @@ export function StoryDetail() {
       premium: isPaidStory && !isPurchased && !e.is_free && e.episode_number > 3,
       locked: !canAccessEpisode(e.episode_number),
       accessible: canAccessEpisode(e.episode_number),
-      onClick: () => handleEpisodeClick(e.episode_number) // Pass click handler
+      onClick: () => handleEpisodeClick(e.episode_number)
     }))
   };
 
@@ -268,7 +347,7 @@ export function StoryDetail() {
               </p>
             )}
 
-            {/* Micro Stats - removed price from here */}
+            {/* Micro Stats */}
             <div className="mt-4 flex flex-wrap justify-center md:justify-start items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
               <span className="inline-flex items-center gap-1">
                 <StarIcon className="h-3.5 w-3.5 fill-[#C9A24A] text-[#C9A24A]" />
@@ -289,7 +368,6 @@ export function StoryDetail() {
             {/* Smart Read Button */}
             <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-3">
               {allEpisodesLocked ? (
-                // If all episodes are locked, show purchase button
                 <ButtonLink
                   to={`/hadithi/${story.slug}/nunua`}
                   size="lg"
@@ -298,7 +376,6 @@ export function StoryDetail() {
                   Nunua Hadithi
                 </ButtonLink>
               ) : (
-                // Show continue/start reading button
                 <ButtonLink
                   to={`/soma/${story.slug}/${startEpisode}`}
                   size="lg"
@@ -337,7 +414,7 @@ export function StoryDetail() {
             )}
           </section>
 
-          {/* Chapter Episodes List - Pass the enhanced story object */}
+          {/* Chapter Episodes List */}
           <EpisodeList story={storyObj} onEpisodeClick={handleEpisodeClick} />
           
           {/* Ratings & Comments */}
@@ -350,14 +427,40 @@ export function StoryDetail() {
               <CommentsSection storyId={story.id} />
             </div>
           </div>
+
+          {/* Similar Stories Section - Moved to bottom */}
+          {similarStories.length > 0 && (
+            <section className="pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h3 className="font-display text-xl font-bold text-gray-900">
+                  📚 Hadithi Nyinginezo
+                </h3>
+                <Link
+                  to={`/makundi/${story.categories?.slug || ''}`}
+                  className="text-sm font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors flex items-center gap-1"
+                >
+                  Ona Zote
+                  <span className="text-lg">→</span>
+                </Link>
+              </div>
+
+              {/* Horizontal Scroll */}
+              <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 scroll-smooth">
+                {similarStories.map((story) => (
+                  <SimilarStoryCard key={story.id} story={story} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
-      {related.length > 0 && (
+      {/* REMOVED: Duplicate StoryRail section */}
+      {/* {related.length > 0 && (
         <div className="mt-16 border-t border-gray-100 pt-10">
           <StoryRail title="Hadithi zinazofanana" stories={related.map(s => ({...s, cover: s.cover_url}))} href="/hadithi" />
         </div>
-      )}
+      )} */}
 
       {/* Paywall Modal */}
       {showPaywallModal && (
@@ -373,11 +476,55 @@ export function StoryDetail() {
           onSuccess={() => {
             setShowPaywallModal(false);
             setSelectedEpisode(null);
-            // Refresh the page to update access
             window.location.reload();
           }}
         />
       )}
     </article>
+  );
+}
+
+/* ── Similar Story Card ────────────────────────────────────────────────────── */
+function SimilarStoryCard({ story }: { story: any }) {
+  const { hasPurchasedStory } = useAuth();
+  const isPurchased = hasPurchasedStory(story.id);
+  const isPaid = (story.price ?? 1000) > 0;
+
+  return (
+    <Link
+      to={`/hadithi/${story.slug}`}
+      className="group flex w-[130px] shrink-0 flex-col sm:w-[150px]"
+    >
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-100 shadow-sm group-hover:shadow-md transition-shadow duration-300">
+        {story.cover_url ? (
+          <img
+            src={story.cover_url}
+            alt={`Jalada la ${story.title}`}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#9B1B3B]/10 to-[#C9A24A]/10">
+            <span className="font-display text-3xl font-black text-[#9B1B3B]/30">
+              {story.title?.charAt(0) || '?'}
+            </span>
+          </div>
+        )}
+
+        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+          <Eye className="w-3 h-3 text-gray-300" />
+          {compact(story.total_reads || 0)}
+        </span>
+      </div>
+
+      <p className="mt-2 line-clamp-2 text-[13px] font-semibold leading-snug text-gray-900 group-hover:text-[#9B1B3B] transition-colors duration-200">
+        {story.title}
+      </p>
+      {story.authors?.name && (
+        <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">
+          {story.authors.name}
+        </p>
+      )}
+    </Link>
   );
 }

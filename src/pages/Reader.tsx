@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftIcon, ArrowRightIcon, ClockIcon, LockIcon, UnlockIcon } from 'lucide-react';
+import { ArrowLeftIcon, ArrowRightIcon, ClockIcon, LockIcon, UnlockIcon, Eye } from 'lucide-react';
 import { useKisa } from '../contexts/KisaContext';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -11,7 +11,8 @@ import { YouTubeEmbed } from '../components/reader/YouTubeEmbed';
 import { CommentsSection } from '../components/CommentsSection';
 import { RatingWidget } from '../components/RatingWidget';
 import { cn } from '../utils/cn';
-import { track } from '../lib/pixel'; // ✅ Add this import
+import { track } from '../lib/pixel';
+import { compact } from '../utils/format';
 
 export function Reader() {
   const { slug, episode } = useParams();
@@ -22,6 +23,7 @@ export function Reader() {
   const [story, setStory] = useState<any>(null);
   const [ep, setEp] = useState<any>(null);
   const [allEpisodes, setAllEpisodes] = useState<any[]>([]);
+  const [similarStories, setSimilarStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scrollPercent, setScrollPercent] = useState(0);
@@ -39,7 +41,7 @@ export function Reader() {
       try {
         const { data: storyData, error: storyErr } = await supabase
           .from('stories')
-          .select('*, authors(*)')
+          .select('*, authors(*), categories(*)')
           .eq('slug', slug)
           .single();
 
@@ -102,6 +104,78 @@ export function Reader() {
       });
     }
   }, [ep, story, showPaywall]);
+
+  // ✅ Increment total_reads when an episode is read
+  useEffect(() => {
+    if (story && ep && !showPaywall) {
+      // Check if already counted this session
+      const viewedKey = `read_episode_${story.id}_${ep.episode_number}`;
+      if (sessionStorage.getItem(viewedKey)) {
+        console.log('📊 Episode read already counted for this session');
+        return;
+      }
+      
+      // Increment total_reads for the story
+      const incrementReads = async () => {
+        try {
+          // Get current total_reads
+          const { data } = await supabase
+            .from('stories')
+            .select('total_reads')
+            .eq('id', story.id)
+            .single();
+          
+          if (data) {
+            const currentReads = data.total_reads || 0;
+            const newReads = currentReads + 1;
+            
+            const { error } = await supabase
+              .from('stories')
+              .update({ total_reads: newReads })
+              .eq('id', story.id);
+            
+            if (error) {
+              console.error('Error updating total_reads:', error);
+            } else {
+              // Mark as read in this session
+              sessionStorage.setItem(viewedKey, 'true');
+              console.log('📊 Total reads incremented to:', newReads);
+            }
+          }
+        } catch (err) {
+          console.error('Error incrementing reads:', err);
+        }
+      };
+      
+      incrementReads();
+    }
+  }, [story, ep, showPaywall]);
+
+  // ✅ Load similar stories
+  useEffect(() => {
+    async function loadSimilarStories() {
+      if (!story) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('stories')
+          .select('id, slug, title, cover_url, hook, price, total_reads, authors(name)')
+          .eq('status', 'published')
+          .eq('category_id', story.category_id)
+          .neq('id', story.id)
+          .order('total_reads', { ascending: false })
+          .limit(10);
+        
+        if (!error && data) {
+          setSimilarStories(data);
+        }
+      } catch (err) {
+        console.error('Error loading similar stories:', err);
+      }
+    }
+    
+    loadSimilarStories();
+  }, [story]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -348,6 +422,101 @@ export function Reader() {
     );
   };
 
+  /* ── Similar Stories Component ──────────────────────────────────────────────── */
+  const SimilarStories = () => {
+    if (!similarStories || similarStories.length === 0) return null;
+
+    return (
+      <section className="mt-16 border-t pt-8" aria-label="Hadithi zinazofanana">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <h3 className={cn(
+            'font-display text-lg font-bold',
+            light ? 'text-gray-900' : 'text-[#F6F0E8]'
+          )}>
+            📚 Hadithi Nyinginezo
+          </h3>
+          <Link
+            to={`/makundi/${story.categories?.slug || ''}`}
+            className="text-sm font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors flex items-center gap-1"
+          >
+            Ona Zote
+            <ArrowRightIcon className="h-4 w-4" />
+          </Link>
+        </div>
+
+        {/* Horizontal Scroll */}
+        <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 scroll-smooth">
+          {similarStories.map((story) => (
+            <SimilarStoryCard key={story.id} story={story} light={light} />
+          ))}
+        </div>
+      </section>
+    );
+  };
+
+  /* ── Similar Story Card ────────────────────────────────────────────────────── */
+  const SimilarStoryCard = ({ story, light }: { story: any; light: boolean }) => {
+    const isPurchased = hasPurchasedStory(story.id);
+    const isPaid = (story.price ?? 1000) > 0;
+
+    return (
+      <Link
+        to={`/hadithi/${story.slug}`}
+        className="group flex w-[130px] shrink-0 flex-col sm:w-[150px]"
+      >
+        {/* Cover */}
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-100 shadow-sm group-hover:shadow-md transition-shadow duration-300">
+          {story.cover_url ? (
+            <img
+              src={story.cover_url}
+              alt={`Jalada la ${story.title}`}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#9B1B3B]/10 to-[#C9A24A]/10">
+              <span className="font-display text-3xl font-black text-[#9B1B3B]/30">
+                {story.title.charAt(0)}
+              </span>
+            </div>
+          )}
+
+          {/* Price/Free Badge */}
+          {/* <div className="absolute top-2 left-2">
+            {isPaid && !isPurchased ? (
+              <span className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-black backdrop-blur-sm">
+                Premium
+              </span>
+            ) : (
+              <span className="rounded bg-green-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-black backdrop-blur-sm">
+                Bure
+              </span>
+            )}
+          </div> */}
+
+          {/* Views Badge */}
+          <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+            <Eye className="w-3 h-3 text-gray-300" />
+            {compact(story.total_reads || 0)}
+          </span>
+        </div>
+
+        {/* Text */}
+        <p className={cn(
+          'mt-2 line-clamp-2 text-[13px] font-semibold leading-snug group-hover:text-[#9B1B3B] transition-colors duration-200',
+          light ? 'text-gray-900' : 'text-[#F6F0E8]'
+        )}>
+          {story.title}
+        </p>
+        {story.authors?.name && (
+          <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">
+            {story.authors.name}
+          </p>
+        )}
+      </Link>
+    );
+  };
+
   return (
     <div className={cn('min-h-screen w-full', light ? 'bg-white text-gray-900' : 'bg-[#0E0C0D] text-[#F6F0E8]')}>
       {/* Sticky progress header */}
@@ -496,6 +665,10 @@ export function Reader() {
               {/* ── BOTTOM Chapter Navigation ── */}
               <ChapterNav position="bottom" />
 
+              {/* ── Similar Stories ── */}
+              <SimilarStories />
+
+              {/* ── Comments & Rating ── */}
               <div className={cn('mt-16 border-t pt-8', light ? 'border-gray-100' : 'border-white/10')}>
                 <RatingWidget episodeId={ep.id} storyId={story.id} />
               </div>
