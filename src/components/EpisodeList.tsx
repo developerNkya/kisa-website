@@ -28,11 +28,11 @@ export function EpisodeList({ story, initialCount = 8 }: { story: Story; initial
         </p>
       </div>
 
-      {isPaidStory && !isPurchased && (
+      {/* {isPaidStory && !isPurchased && (
         <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3.5 py-2">
           🔒 Sehemu 1–3 ni bure. Sehemu ya 4 na zaidi zinahitaji ununuzi wa TZS {(story.price || 1000).toLocaleString()}.
         </p>
-      )}
+      )} */}
 
       <ol className="mt-4 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-150 bg-gray-50/50">
         {visible.map((ep) => {
@@ -69,7 +69,7 @@ export function EpisodeList({ story, initialCount = 8 }: { story: Story; initial
                     to={`/soma/${story.slug}/${ep.number}`}
                     className="shrink-0 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 hover:border-[#9B1B3B]/40 hover:text-[#9B1B3B] transition-colors"
                   >
-                    {ep.number <= 3 ? 'Soma (Bure)' : 'Soma'}
+                    {ep.number <= 3 ? 'Soma' : 'Soma'}
                   </Link>
                 ) : (
                   <span

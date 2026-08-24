@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookOpenIcon, ClockIcon, StarIcon } from 'lucide-react';
+import { BookOpenIcon, ClockIcon, StarIcon, LockIcon } from 'lucide-react';
 import { EpisodeList } from '../components/EpisodeList';
 import { StoryRail } from '../components/StoryRail';
 import { ButtonLink } from '../components/ui/Button';
@@ -20,6 +20,7 @@ export function StoryDetail() {
   const [related, setRelated] = useState<any[]>([]);
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -73,6 +74,79 @@ export function StoryDetail() {
     loadData();
   }, [slug, user]);
 
+  // Check if user can access a specific episode
+  const canAccessEpisode = (episodeNumber: number) => {
+    // First 3 episodes are always free
+    if (episodeNumber <= 3) return true;
+    
+    // If story is free, all episodes are accessible
+    const isPaidStory = (story?.price ?? 1000) > 0;
+    if (!isPaidStory) return true;
+    
+    // Check if user has purchased the story
+    return hasPurchasedStory(story?.id);
+  };
+
+  // Get the next unlocked episode for the "Continue Reading" button
+  const getNextUnlockedEpisode = () => {
+    if (!episodes.length) return 1;
+    
+    // Find first unlocked episode
+    for (let i = 0; i < episodes.length; i++) {
+      if (canAccessEpisode(episodes[i].episode_number)) {
+        return episodes[i].episode_number;
+      }
+    }
+    return 1; // Fallback
+  };
+
+  // Get the episode to start reading from (continue progress or first unlocked)
+  const getStartEpisode = () => {
+    // If user has progress, try to continue from there
+    if (progress) {
+      const nextEp = progress.episode_number + 1;
+      // If next episode is locked, find the last unlocked episode
+      if (!canAccessEpisode(nextEp)) {
+        // Find the highest unlocked episode they've read
+        for (let i = episodes.length - 1; i >= 0; i--) {
+          const ep = episodes[i];
+          if (ep.episode_number <= progress.episode_number && 
+              canAccessEpisode(ep.episode_number)) {
+            return ep.episode_number;
+          }
+        }
+      }
+      return nextEp <= episodes.length ? nextEp : progress.episode_number;
+    }
+    
+    // No progress, start from first unlocked episode
+    return getNextUnlockedEpisode();
+  };
+
+  const startEpisode = getStartEpisode();
+  const isPurchased = hasPurchasedStory(story?.id);
+  const storyPrice = story?.price ?? 1000;
+  const isPaidStory = storyPrice > 0;
+  const hasFreeEpisodes = episodes.some(e => e.episode_number <= 3);
+  const allEpisodesLocked = !hasFreeEpisodes && !isPurchased;
+
+  const minutes = totalMinutes(episodes.map((e) => e.reading_minutes || 5));
+  const tags = story?.tags || [];
+
+  // Enhanced story object with premium info
+  const storyObj = {
+    ...story,
+    episodes: episodes.map(e => ({
+      ...e,
+      number: e.episode_number,
+      readingMinutes: e.reading_minutes || 5,
+      publishedAt: e.published_at || e.created_at,
+      premium: isPaidStory && !isPurchased && e.episode_number > 3,
+      locked: isPaidStory && !isPurchased && e.episode_number > 3,
+      accessible: canAccessEpisode(e.episode_number)
+    }))
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500 bg-white">
@@ -93,24 +167,6 @@ export function StoryDetail() {
       </div>
     );
   }
-
-  const isPurchased = hasPurchasedStory(story.id);
-  const storyPrice = story.price ?? 1000;
-  const isPaidStory = storyPrice > 0;
-
-  const minutes = totalMinutes(episodes.map((e) => e.reading_minutes || 5));
-  const tags = story.tags || [];
-
-  const storyObj = {
-    ...story,
-    episodes: episodes.map(e => ({
-      ...e,
-      number: e.episode_number,
-      readingMinutes: e.reading_minutes || 5,
-      publishedAt: e.published_at || e.created_at,
-      premium: isPaidStory && !isPurchased && e.episode_number > 3
-    }))
-  };
 
   return (
     <article className="min-h-screen bg-white text-gray-900 pb-24">
@@ -149,6 +205,14 @@ export function StoryDetail() {
               Mwandishi: <span className="font-semibold text-gray-800">{story.authors?.name || 'Mwandishi wa KISA'}</span>
             </p>
 
+            {/* Premium badge */}
+            {isPaidStory && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#9B1B3B]/10 px-3 py-1 text-xs font-semibold text-[#9B1B3B]">
+                <LockIcon className="h-3 w-3" />
+                {isPurchased ? 'Umeweza Kufungua' : 'Hadithi ya Malipo'}
+              </div>
+            )}
+
             {story.hook && (
               <p className="mt-4 font-display text-base italic text-gray-600 max-w-xl">
                 “{story.hook}”
@@ -173,15 +237,27 @@ export function StoryDetail() {
               </span>
             </div>
 
-            {/* Prominent Soma button */}
-            <div className="mt-6 flex justify-center md:justify-start">
-              <ButtonLink
-                to={`/soma/${story.slug}/1`}
-                size="lg"
-                className="px-10 py-3 bg-[#9B1B3B] hover:bg-[#C42B53] text-white rounded-full font-bold shadow-sm"
-              >
-                Soma
-              </ButtonLink>
+            {/* Smart Read Button */}
+            <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-3">
+              {allEpisodesLocked ? (
+                // If all episodes are locked, show purchase button
+                <ButtonLink
+                  to={`/hadithi/${story.slug}/nunua`}
+                  size="lg"
+                  className="px-10 py-3 bg-[#9B1B3B] hover:bg-[#C42B53] text-white rounded-full font-bold shadow-sm"
+                >
+                  Nunua Hadithi
+                </ButtonLink>
+              ) : (
+                // Show continue/start reading button
+                <ButtonLink
+                  to={`/soma/${story.slug}/${startEpisode}`}
+                  size="lg"
+                  className="px-10 py-3 bg-[#9B1B3B] hover:bg-[#C42B53] text-white rounded-full font-bold shadow-sm"
+                >
+                  {progress ? 'Endelea Kusoma' : 'Soma'}
+                </ButtonLink>
+              )}
             </div>
           </div>
         </div>
@@ -212,7 +288,7 @@ export function StoryDetail() {
             )}
           </section>
 
-          {/* Chapter Episodes List */}
+          {/* Chapter Episodes List - Pass the enhanced story object */}
           <EpisodeList story={storyObj} />
           
           {/* Ratings & Comments */}
