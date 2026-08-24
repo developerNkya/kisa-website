@@ -14,15 +14,24 @@ interface KisaContextType {
 const defaultReaderPrefs: ReaderPrefs = {
   fontSize: 18,
   width: 'narrow',
-  mode: 'dark',
+  mode: 'light',
 };
 
 const KisaContext = createContext<KisaContextType | undefined>(undefined);
 
 export function KisaProvider({ children }: { children: ReactNode }) {
   const [readerPrefs, setReaderPrefs] = useState<ReaderPrefs>(() => {
-    const saved = localStorage.getItem('kisa_reader_prefs');
-    return saved ? JSON.parse(saved) : defaultReaderPrefs;
+    try {
+      const saved = localStorage.getItem('kisa_reader_prefs');
+      const parsed = saved ? JSON.parse(saved) : {};
+      return {
+        fontSize: parsed.fontSize ?? 18,
+        width: parsed.width ?? 'narrow',
+        mode: 'light', // always start light — user can toggle dark via controls
+      };
+    } catch {
+      return defaultReaderPrefs;
+    }
   });
 
   useEffect(() => {

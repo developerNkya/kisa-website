@@ -12,7 +12,7 @@ export function SiteLayout() {
   }, [pathname]);
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-ink">
+    <div className="flex min-h-screen w-full flex-col bg-white">
       <Navbar />
       <main className="flex-1 pb-20 lg:pb-0">
         <Outlet />

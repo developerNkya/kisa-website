@@ -1,20 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookOpenIcon, ClockIcon, StarIcon, CheckCircle2, ShoppingBag } from 'lucide-react';
+import { BookOpenIcon, ClockIcon, StarIcon } from 'lucide-react';
 import { EpisodeList } from '../components/EpisodeList';
 import { StoryRail } from '../components/StoryRail';
-import { Button, ButtonLink } from '../components/ui/Button';
-import { BookmarkButton } from '../components/BookmarkButton';
-import { ShareButton } from '../components/ShareButton';
-import { OriginalBadge } from '../components/ui/Badge';
-import { ProgressBar } from '../components/ui/ProgressBar';
+import { ButtonLink } from '../components/ui/Button';
 import { ErrorState } from '../components/states/ErrorState';
 import { CommentsSection } from '../components/CommentsSection';
 import { RatingWidget } from '../components/RatingWidget';
-import { SubscriptionExpiredModal } from '../components/SubscriptionExpiredModal';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
-import { readingLabel, swahiliDate, totalMinutes, compact } from '../utils/format';
+import { readingLabel, totalMinutes } from '../utils/format';
 
 export function StoryDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -25,7 +20,6 @@ export function StoryDetail() {
   const [related, setRelated] = useState<any[]>([]);
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -79,11 +73,17 @@ export function StoryDetail() {
     loadData();
   }, [slug, user]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-mist">Inapakia...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500 bg-white">
+        Inapakia...
+      </div>
+    );
+  }
 
   if (!story) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
+      <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6 bg-white">
         <ErrorState
           title="Hadithi hii haipatikani"
           body="Inawezekana hadithi imeondolewa au kiungo hakikuwa sahihi. Kuna hadithi nyingi nyingine zinazokusubiri."
@@ -101,16 +101,6 @@ export function StoryDetail() {
   const minutes = totalMinutes(episodes.map((e) => e.reading_minutes || 5));
   const tags = story.tags || [];
 
-  const info = [
-    { label: 'Kundi', value: story.categories?.name || 'Hadithi' },
-    { label: 'Mwandishi', value: story.authors?.name || 'Mwandishi wa KISA' },
-    { label: 'Bei', value: isPaidStory ? `TZS ${storyPrice.toLocaleString()}` : 'Bure' },
-    { label: 'Sehemu', value: `${episodes.length} (Sehemu 3 za kwanza ni Bure)` },
-    { label: 'Hali', value: story.status === 'published' ? 'Imetolewa' : story.status },
-    { label: 'Imetolewa', value: swahiliDate(story.created_at) },
-    { label: 'Wasomaji', value: compact(story.total_reads || 0) }
-  ];
-
   const storyObj = {
     ...story,
     episodes: episodes.map(e => ({
@@ -123,193 +113,125 @@ export function StoryDetail() {
   };
 
   return (
-    <article>
-      <div className="relative">
-        <div className="absolute inset-0 h-[320px] overflow-hidden lg:h-[420px]">
-          <img src={story.cover_url} alt="" aria-hidden="true" className="h-full w-full object-cover object-[50%_25%]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/40" />
-        </div>
+    <article className="min-h-screen bg-white text-gray-900 pb-24">
+      {/* Top Banner Block */}
+      <div className="mx-auto max-w-[1400px] px-4 pt-6 sm:px-6 lg:px-10">
+        <nav aria-label="Njia" className="mb-6 text-xs text-gray-400">
+          <Link to="/" className="hover:text-gray-950">Mwanzo</Link>
+          <span className="px-1.5">/</span>
+          <Link to="/hadithi" className="hover:text-gray-950">Hadithi</Link>
+          <span className="px-1.5">/</span>
+          <span className="text-gray-900 font-medium">{story.title}</span>
+        </nav>
 
-        <div className="relative mx-auto max-w-[1400px] px-4 pb-12 pt-10 sm:px-6 lg:px-10 lg:pt-20">
-          <nav aria-label="Njia" className="mb-6 text-xs text-mist">
-            <Link to="/" className="hover:text-cream">Mwanzo</Link>
-            <span className="px-1.5 text-dust">/</span>
-            <Link to="/hadithi" className="hover:text-cream">Hadithi</Link>
-            <span className="px-1.5 text-dust">/</span>
-            <span className="text-cream">{story.title}</span>
-          </nav>
+        {/* Story details layout */}
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8 pb-10 border-b border-gray-100">
+          {/* Cover Art */}
+          <div className="w-[150px] shrink-0 sm:w-[180px] md:w-[210px] mx-auto md:mx-0">
+            <img
+              src={story.cover_url}
+              alt={`Jalada la ${story.title}`}
+              className="aspect-[2/3] w-full rounded-xl border border-gray-100 object-cover shadow-md"
+            />
+          </div>
 
-          <div className="grid gap-8 lg:grid-cols-[320px_1fr] lg:gap-12">
-            <div className="mx-auto w-[190px] shrink-0 sm:w-[230px] lg:mx-0 lg:w-full">
-              <img
-                src={story.cover_url}
-                alt={`Jalada la ${story.title}`}
-                className="aspect-[2/3] w-full rounded-2xl border border-line object-cover shadow-2xl"
-              />
+          {/* Core Info */}
+          <div className="flex-1 text-center md:text-left min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#9B1B3B]">
+              {story.categories?.name || 'Hadithi'}
+            </p>
+
+            <h1 className="mt-2 font-display text-2xl font-black leading-tight text-gray-900 sm:text-4xl">
+              {story.title}
+            </h1>
+
+            <p className="mt-1 text-sm text-gray-500">
+              Mwandishi: <span className="font-semibold text-gray-800">{story.authors?.name || 'Mwandishi wa KISA'}</span>
+            </p>
+
+            {story.hook && (
+              <p className="mt-4 font-display text-base italic text-gray-600 max-w-xl">
+                “{story.hook}”
+              </p>
+            )}
+
+            {/* Micro Stats */}
+            <div className="mt-4 flex flex-wrap justify-center md:justify-start items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
+              <span className="inline-flex items-center gap-1">
+                <StarIcon className="h-3.5 w-3.5 fill-[#C9A24A] text-[#C9A24A]" />
+                {story.avg_rating || '5.0'}
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1">
+                <BookOpenIcon className="h-3.5 w-3.5 text-gray-400" />
+                {episodes.length} Sehemu
+              </span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1">
+                <ClockIcon className="h-3.5 w-3.5 text-gray-400" />
+                {readingLabel(minutes)}
+              </span>
             </div>
 
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                {story.is_original && <OriginalBadge />}
-                {!isPaidStory ? (
-                  <span className="rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-semibold px-3 py-1">
-                    Bure
-                  </span>
-                ) : isPurchased ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-semibold px-3 py-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Umeshanunua
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-gold/15 text-gold text-xs font-semibold px-3 py-1 border border-gold/30">
-                    TZS {storyPrice.toLocaleString()}
-                  </span>
-                )}
-              </div>
-
-              <h1 className="mt-3 font-display text-3xl font-black leading-[1.05] text-cream sm:text-5xl">
-                {story.title}
-              </h1>
-              <p className="mt-3 font-display text-lg italic text-gold sm:text-xl">“{story.hook || story.description?.substring(0, 50)}”</p>
-
-              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-cream/85">
-                <span>{story.categories?.name || 'Hadithi'}</span>
-                <span className="inline-flex items-center gap-1.5">
-                  <StarIcon className="h-4 w-4 fill-gold text-gold" aria-hidden="true" />
-                  {story.avg_rating || '5.0'}
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <BookOpenIcon className="h-4 w-4 text-gold" aria-hidden="true" />
-                  {episodes.length} Sehemu
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <ClockIcon className="h-4 w-4 text-gold" aria-hidden="true" />
-                  {readingLabel(minutes)}
-                </span>
-              </div>
-
-              {progress && (
-                <div className="mt-6 max-w-md rounded-xl border border-line-soft bg-surface p-4">
-                  <div className="mb-2 flex items-center justify-between text-xs text-mist">
-                    <span>{progress.percent}% Imesomwa</span>
-                    <span className="text-dust">{swahiliDate(progress.updated_at)}</span>
-                  </div>
-                  <ProgressBar percent={progress.percent} label={`Maendeleo ya ${story.title}`} />
-                </div>
-              )}
-
-              <div className="mt-7 flex flex-wrap gap-3">
-                <ButtonLink
-                  to={`/soma/${story.slug}/1`}
-                  size="lg"
-                >
-                  {progress ? 'Endelea Kusoma' : 'Soma Sehemu ya 1 (Bure)'}
-                </ButtonLink>
-
-                {isPaidStory && !isPurchased && (
-                  <Button
-                    onClick={() => setShowPurchaseModal(true)}
-                    variant="secondary"
-                    size="lg"
-                    className="border-gold/50 bg-gold/10 text-gold hover:bg-gold/20"
-                  >
-                    <ShoppingBag className="w-4 h-4 mr-2" />
-                    Nunua Hadithi Yote (TZS {storyPrice.toLocaleString()})
-                  </Button>
-                )}
-
-                <BookmarkButton storyId={story.id} storyTitle={story.title} />
-                <ShareButton
-                  storyTitle={story.title}
-                  teaser={story.hook}
-                  url={`https://kisa.co.tz/hadithi/${story.slug}`}
-                />
-              </div>
+            {/* Prominent Soma button */}
+            <div className="mt-6 flex justify-center md:justify-start">
+              <ButtonLink
+                to={`/soma/${story.slug}/1`}
+                size="lg"
+                className="px-10 py-3 bg-[#9B1B3B] hover:bg-[#C42B53] text-white rounded-full font-bold shadow-sm"
+              >
+                Soma
+              </ButtonLink>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1400px] px-4 pb-4 sm:px-6 lg:px-10">
-        <div className="grid gap-10 lg:grid-cols-[1fr_340px] lg:gap-14">
-          <div className="min-w-0 space-y-12">
-            <section aria-labelledby="about-heading">
-              <h2 id="about-heading" className="font-display text-2xl font-bold text-cream">
-                Kuhusu Hadithi
-              </h2>
-              <p className="mt-4 max-w-2xl font-read text-[17px] leading-[1.85] text-cream/85 whitespace-pre-line">
-                {story.description}
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
+      {/* Description & Episodes List */}
+      <div className="mx-auto max-w-[1000px] px-4 pt-10 sm:px-6 lg:px-10">
+        <div className="space-y-12">
+          {/* Kuhusu Hadithi */}
+          <section aria-labelledby="about-heading">
+            <h2 id="about-heading" className="font-display text-xl font-bold text-gray-900">
+              Kuhusu Hadithi
+            </h2>
+            <p className="mt-3 max-w-3xl font-read text-base leading-relaxed text-gray-700 whitespace-pre-line">
+              {story.description}
+            </p>
+            {tags.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
                 {tags.map((t: string) => (
                   <span
                     key={t}
-                    className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs text-mist"
+                    className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
                   >
-                    {t}
+                    #{t}
                   </span>
                 ))}
               </div>
-            </section>
+            )}
+          </section>
 
-            <EpisodeList story={storyObj} />
-            
-            <div className="mt-12">
+          {/* Chapter Episodes List */}
+          <EpisodeList story={storyObj} />
+          
+          {/* Ratings & Comments */}
+          <div className="grid gap-10 pt-4 border-t border-gray-100 md:grid-cols-2">
+            <div>
+              <h3 className="font-display text-lg font-bold text-gray-900 mb-4">Tathmini Hadithi</h3>
               <RatingWidget storyId={story.id} />
             </div>
-            <div className="mt-12">
+            <div>
               <CommentsSection storyId={story.id} />
             </div>
           </div>
-
-          <aside className="space-y-6">
-            <section
-              aria-labelledby="info-heading"
-              className="rounded-card border border-line-soft bg-surface p-5"
-            >
-              <h2 id="info-heading" className="font-display text-lg font-bold text-cream">
-                Taarifa
-              </h2>
-              <dl className="mt-4 space-y-3">
-                {info.map((row) => (
-                  <div key={row.label} className="flex items-baseline justify-between gap-4 border-b border-line-soft pb-3 last:border-0 last:pb-0">
-                    <dt className="text-xs uppercase tracking-[0.12em] text-dust">{row.label}</dt>
-                    <dd className="text-right text-sm font-medium text-cream">{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            {isPaidStory && !isPurchased && (
-              <div className="rounded-2xl border border-gold/30 bg-[#171112] p-5 text-center">
-                <h3 className="font-display text-lg font-bold text-cream">Fungua Hadithi Hii</h3>
-                <p className="text-xs text-mist mt-1.5">
-                  Soma sehemu 3 za kwanza bure. Lipia TZS {storyPrice.toLocaleString()} kufungua hadithi yote milele.
-                </p>
-                <Button
-                  onClick={() => setShowPurchaseModal(true)}
-                  className="w-full mt-4 bg-wine hover:bg-wine-bright text-cream"
-                >
-                  Nunua Sasa — TZS {storyPrice.toLocaleString()}
-                </Button>
-              </div>
-            )}
-          </aside>
         </div>
       </div>
 
       {related.length > 0 && (
-        <StoryRail title="Hadithi zinazofanana" stories={related.map(s => ({...s, cover: s.cover_url}))} href="/hadithi" />
-      )}
-
-      {showPurchaseModal && (
-        <SubscriptionExpiredModal
-          storyId={story.id}
-          storyTitle={story.title}
-          price={storyPrice}
-          onClose={() => setShowPurchaseModal(false)}
-          onSuccess={() => setShowPurchaseModal(false)}
-        />
+        <div className="mt-16 border-t border-gray-100 pt-10">
+          <StoryRail title="Hadithi zinazofanana" stories={related.map(s => ({...s, cover: s.cover_url}))} href="/hadithi" />
+        </div>
       )}
     </article>
   );

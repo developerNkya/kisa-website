@@ -29,7 +29,7 @@ export function SearchBar({
       className={cn('relative w-full', className)}>
       
       <SearchIcon
-        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-dust"
+        className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
         aria-hidden="true" />
       
       <input
@@ -40,7 +40,7 @@ export function SearchBar({
         placeholder={placeholder}
         aria-label={placeholder}
         className={cn(
-          'w-full rounded-full border border-line bg-surface pl-11 pr-11 text-cream placeholder:text-dust transition-colors duration-150 ease-kisa focus:border-gold/50 focus:outline-none',
+          'w-full rounded-full border border-gray-200 bg-gray-50 pl-11 pr-11 text-gray-900 placeholder:text-gray-400 transition-colors duration-150 ease-kisa focus:bg-white focus:border-[#9B1B3B]/50 focus:outline-none',
           size === 'lg' ? 'h-14 text-base' : 'h-11 text-sm'
         )} />
       
@@ -49,7 +49,7 @@ export function SearchBar({
         type="button"
         onClick={() => onChange('')}
         aria-label="Safisha utafutaji"
-        className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-dust transition-colors duration-150 ease-kisa hover:bg-surface-high hover:text-cream">
+        className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-gray-400 transition-colors duration-150 ease-kisa hover:bg-gray-200 hover:text-gray-900">
         
           <XIcon className="h-4 w-4" />
         </button>

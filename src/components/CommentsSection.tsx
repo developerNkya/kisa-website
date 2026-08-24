@@ -112,95 +112,95 @@ export function CommentsSection({ storyId, episodeId, requireAuth = false }: Com
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <h3 className="font-display text-2xl text-cream font-bold">Maoni</h3>
+    <div className="flex flex-col gap-5 bg-white text-gray-900">
+      <h3 className="font-display text-xl font-bold text-gray-900 border-b border-gray-100 pb-2">Maoni</h3>
       
       {(!requireAuth || user) ? (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Ongeza maoni..."
-            className="w-full bg-surface-raised border border-line rounded-lg p-3 text-cream placeholder:text-mist focus:outline-none focus:border-wine focus:ring-1 focus:ring-wine min-h-[100px] resize-y"
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#9B1B3B]/50 focus:ring-1 focus:ring-[#9B1B3B]/50 min-h-[90px] resize-y"
             disabled={!user || submitting}
           />
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={!user || !newComment.trim() || submitting}
-              className="bg-wine hover:bg-wine-bright text-cream font-medium py-2 px-6 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-[#9B1B3B] hover:bg-[#C42B53] text-white font-semibold py-2 px-5 rounded-full text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Inatuma...' : 'Tuma'}
             </button>
           </div>
           {!user && (
-            <p className="text-sm text-mist">
-              <a href="/ingia" className="text-wine-bright hover:underline">Ingia</a> ili kutoa maoni yako.
+            <p className="text-xs text-gray-500">
+              <a href="/ingia" className="text-[#9B1B3B] font-semibold hover:underline">Ingia</a> ili kutoa maoni yako.
             </p>
           )}
         </form>
       ) : (
-        <div className="bg-surface-raised border border-line rounded-lg p-6 text-center">
-          <p className="text-mist mb-4">Ingia ili kutoa maoni yako</p>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+          <p className="text-gray-500 text-sm mb-3">Ingia ili kutoa maoni yako</p>
           <a
             href="/ingia"
-            className="inline-block bg-wine hover:bg-wine-bright text-cream font-medium py-2 px-6 rounded-md transition-colors"
+            className="inline-block bg-[#9B1B3B] hover:bg-[#C42B53] text-white font-semibold py-2 px-5 rounded-full text-xs transition-colors"
           >
             Ingia
           </a>
         </div>
       )}
 
-      <div className="flex flex-col gap-4 mt-4">
+      <div className="flex flex-col gap-3 mt-2">
         {loading ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex gap-4 animate-pulse">
-              <div className="w-10 h-10 rounded-full bg-surface-raised shrink-0" />
-              <div className="flex-1 flex flex-col gap-2 pt-1">
-                <div className="w-32 h-4 bg-surface-raised rounded" />
-                <div className="w-full h-16 bg-surface-raised rounded" />
+            <div key={i} className="flex gap-3 animate-pulse">
+              <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+              <div className="flex-1 flex flex-col gap-1.5 pt-1">
+                <div className="w-24 h-3 bg-gray-200 rounded" />
+                <div className="w-full h-12 bg-gray-200 rounded" />
               </div>
             </div>
           ))
         ) : comments.length > 0 ? (
           comments.map(comment => (
-            <div key={comment.id} className="flex gap-4 p-4 rounded-lg bg-surface border border-line-soft">
-              <div className="w-10 h-10 rounded-full bg-surface-raised overflow-hidden shrink-0 flex items-center justify-center border border-line">
+            <div key={comment.id} className="flex gap-3 p-3.5 rounded-xl bg-gray-50/60 border border-gray-150">
+              <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden shrink-0 flex items-center justify-center border border-gray-200">
                 {comment.avatar_url ? (
                   <img src={comment.avatar_url} alt={comment.full_name || 'User'} className="w-full h-full object-cover" />
                 ) : (
-                  <User className="w-5 h-5 text-mist" />
+                  <User className="w-4 h-4 text-gray-400" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-start mb-1">
+                <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-medium text-cream text-sm">
+                    <h4 className="font-semibold text-gray-800 text-xs">
                       {comment.full_name || 'Mtumiaji'}
                     </h4>
-                    <p className="text-xs text-mist">
+                    <p className="text-[10px] text-gray-400">
                       {timeAgo(comment.created_at)}
                     </p>
                   </div>
                   {user && user.id === comment.user_id && (
                     <button
                       onClick={() => handleDelete(comment.id)}
-                      className="text-mist hover:text-wine-bright p-1 transition-colors"
+                      className="text-gray-400 hover:text-red-500 p-1 transition-colors"
                       title="Futa maoni"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-                <p className="text-mist text-sm whitespace-pre-wrap mt-2 leading-relaxed">
+                <p className="text-gray-700 text-sm whitespace-pre-wrap mt-2 leading-relaxed">
                   {comment.body}
                 </p>
               </div>
             </div>
           ))
         ) : (
-          <div className="text-center py-8">
-            <p className="text-mist">Hakuna maoni bado. Kuwa wa kwanza kutoa maoni!</p>
+          <div className="text-center py-6">
+            <p className="text-gray-400 text-xs">Hakuna maoni bado. Kuwa wa kwanza kutoa maoni!</p>
           </div>
         )}
       </div>

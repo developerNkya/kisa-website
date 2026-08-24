@@ -13,16 +13,26 @@ body,
 #root {
   width: 100%;
   min-height: 100%;
-  background-color: #0e0c0d;
+  background-color: #ffffff;
 }
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  color: #f6f0e8;
+  color: #1a1a1a;
   -webkit-font-smoothing: antialiased;
 }
 ::selection {
   background: #9b1b3b;
   color: #f6f0e8;
+}
+/* Reader stays dark — no-select for reading content */
+.reader-page {
+  background-color: #0e0c0d;
+  color: #f6f0e8;
+}
+.reader-body {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 *:focus-visible {
   outline: 2px solid #c9a24a;

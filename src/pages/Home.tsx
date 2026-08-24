@@ -1,107 +1,200 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { StoryHero } from '../components/StoryHero';
-import { StoryRail } from '../components/StoryRail';
 import { ContinueReading } from '../components/home/ContinueReading';
-import { OngoingReleases } from '../components/home/OngoingReleases';
-import { OriginalsSpotlight } from '../components/home/OriginalsSpotlight';
-import { FreeStarter } from '../components/home/FreeStarter';
-import { categoryMeta, stories as fallbackStories, trendingStories as fallbackTrending, newStories as fallbackNew } from '../data/stories';
+import { useAuth } from '../lib/AuthContext';
+import { ArrowRightIcon, Loader2, Eye } from 'lucide-react';
+import { compact } from '../utils/format';
+
+interface StoryCard {
+  id: string;
+  slug: string;
+  title: string;
+  cover_url: string | null;
+  hook: string | null;
+  authors?: { name: string };
+  price?: number;
+  total_reads?: number;
+}
+
+interface CategoryShelf {
+  id: string;
+  name: string;
+  slug: string;
+  stories: StoryCard[];
+}
 
 export function Home() {
-  const [newStories, setNewStories] = useState<any[]>(fallbackNew);
-  const [trendingStories, setTrendingStories] = useState<any[]>(fallbackTrending);
-  const [allStories, setAllStories] = useState<any[]>(fallbackStories);
+  const { user } = useAuth();
+  const [shelves, setShelves] = useState<CategoryShelf[]>([]);
+  const [trending, setTrending] = useState<StoryCard[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
+      setLoading(true);
       try {
-        const { data: dbStories, error } = await supabase
-          .from('stories')
-          .select('*, authors(*), categories(*)')
-          .eq('status', 'published')
-          .order('created_at', { ascending: false });
+        const [catsRes, storiesRes] = await Promise.all([
+          supabase.from('categories').select('id, name, slug').order('name'),
+          supabase
+            .from('stories')
+            .select('id, slug, title, cover_url, hook, price, total_reads, category_id, authors(name)')
+            .eq('status', 'published')
+            .order('created_at', { ascending: false })
+            .limit(200),
+        ]);
 
-        if (!error && dbStories && dbStories.length > 0) {
-          const formatted = dbStories.map((s: any) => ({
-            ...s,
-            cover: s.cover_url || '/covers/default.jpg',
-            genres: s.categories?.name ? [s.categories.name] : (s.tags || ['Hadithi']),
-            episodes: Array(s.total_episodes || 5).fill({}),
-          }));
-          
-          setAllStories(formatted);
-          setNewStories(formatted.slice(0, 12));
-          
-          const trending = [...formatted].sort((a, b) => (b.total_reads || 0) - (a.total_reads || 0)).slice(0, 10);
-          setTrendingStories(trending);
-        }
+        const stories: any[] = storiesRes.data || [];
+        const categories: any[] = catsRes.data || [];
+
+        // Build shelves grouped by category
+        const built: CategoryShelf[] = categories
+          .map((cat) => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+            stories: stories
+              .filter((s) => s.category_id === cat.id)
+              .slice(0, 10),
+          }))
+          .filter((shelf) => shelf.stories.length > 0);
+
+        setShelves(built);
+
+        // Trending = top by reads
+        const top = [...stories]
+          .sort((a, b) => (b.total_reads || 0) - (a.total_reads || 0))
+          .slice(0, 10);
+        setTrending(top);
       } catch (e) {
-        console.error('Error fetching home stories:', e);
+        console.error('Home load error:', e);
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
   }, []);
 
-  const byGenre = (genre: string) => allStories.filter((s: any) => (s.genres || []).includes(genre)).slice(0, 8);
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#9B1B3B]" />
+      </div>
+    );
+  }
 
   return (
-    <>
-      {/* Top Slider Hero Images */}
-      <StoryHero />
-      
-      <ContinueReading />
-      
-      {trendingStories.length > 0 && (
-        <StoryRail
-          title="Zinazopendwa Tanzania"
-          blurb="Hadithi ambazo wasomaji hawaziachi."
-          stories={trendingStories}
-          href="/zinazopendwa"
+    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-10 space-y-10">
+      {/* Continue reading — only if logged in */}
+      {user && <ContinueReading />}
+
+      {/* Trending shelf */}
+      {trending.length > 0 && (
+        <Shelf
+          title="🔥 Zinazopendwa Tanzania"
+          stories={trending}
+          viewAllHref="/zinazopendwa"
+          viewAllLabel="Ona Zote"
         />
       )}
-      
-      <OngoingReleases />
-      
-      {newStories.length > 0 && (
-        <StoryRail
-          title="Hadithi Mpya"
-          eyebrow="Zimetoka wiki hii"
-          stories={newStories}
-          href="/mpya"
+
+      {/* Category shelves */}
+      {shelves.map((shelf) => (
+        <Shelf
+          key={shelf.id}
+          title={shelf.name}
+          stories={shelf.stories}
+          viewAllHref={`/makundi/${shelf.slug}`}
+          viewAllLabel="Ona Zote"
         />
+      ))}
+
+      {shelves.length === 0 && !loading && (
+        <div className="py-20 text-center text-gray-400">
+          <p className="text-lg font-semibold">Hakuna hadithi kwa sasa.</p>
+          <p className="mt-2 text-sm">Tafadhali angalia tena baadaye.</p>
+        </div>
       )}
-      
-      {byGenre('Mapenzi').length > 0 && (
-        <StoryRail
-          title="Mapenzi ❤️"
-          blurb={categoryMeta.Mapenzi?.blurb || 'Hadithi za mapenzi na hisia.'}
-          stories={byGenre('Mapenzi')}
-          href="/makundi/Mapenzi"
-        />
+    </div>
+  );
+}
+
+/* ── Story shelf row ──────────────────────────────────────────────────────── */
+function Shelf({
+  title,
+  stories,
+  viewAllHref,
+  viewAllLabel,
+}: {
+  title: string;
+  stories: StoryCard[];
+  viewAllHref: string;
+  viewAllLabel: string;
+}) {
+  return (
+    <section>
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="font-display text-xl font-bold text-gray-900 sm:text-2xl">{title}</h2>
+        <Link
+          to={viewAllHref}
+          className="flex items-center gap-1 text-sm font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors shrink-0"
+        >
+          {viewAllLabel}
+          <ArrowRightIcon className="h-4 w-4" />
+        </Link>
+      </div>
+
+      {/* Horizontal scrolling card row */}
+      <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+        {stories.map((story) => (
+          <StoryThumb key={story.id} story={story} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Story thumbnail card ─────────────────────────────────────────────────── */
+function StoryThumb({ story }: { story: StoryCard }) {
+  const isFree = !story.price || story.price === 0;
+
+  return (
+    <Link
+      to={`/hadithi/${story.slug}`}
+      className="group flex w-[130px] shrink-0 flex-col sm:w-[150px]"
+    >
+      {/* Cover */}
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-100 shadow-sm group-hover:shadow-md transition-shadow">
+        {story.cover_url ? (
+          <img
+            src={story.cover_url}
+            alt={`Jalada la ${story.title}`}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#9B1B3B]/10 to-[#C9A24A]/10">
+            <span className="font-display text-3xl font-black text-[#9B1B3B]/30">
+              {story.title.charAt(0)}
+            </span>
+          </div>
+        )}
+
+        {/* Views badge */}
+        <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+          <Eye className="w-3 h-3 text-gray-300" />
+          {compact(story.total_reads || 0)}
+        </span>
+      </div>
+
+      {/* Text */}
+      <p className="mt-2 line-clamp-2 text-[13px] font-semibold leading-snug text-gray-900 group-hover:text-[#9B1B3B] transition-colors">
+        {story.title}
+      </p>
+      {story.authors?.name && (
+        <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">{story.authors.name}</p>
       )}
-      
-      {byGenre('Siri').length > 0 && (
-        <StoryRail
-          title="Siri & Suspense"
-          blurb="Zisome mchana. Au usiku, kama unaweza."
-          stories={byGenre('Siri')}
-          href="/makundi/Siri"
-          tone="dark"
-        />
-      )}
-      
-      {byGenre('Drama').length > 0 && (
-        <StoryRail
-          title="Drama"
-          blurb="Familia, uhaini, siri na maamuzi magumu."
-          stories={byGenre('Drama')}
-          href="/makundi/Drama"
-        />
-      )}
-      
-      <OriginalsSpotlight />
-      <FreeStarter />
-    </>
+    </Link>
   );
 }

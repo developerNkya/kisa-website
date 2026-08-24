@@ -20,6 +20,7 @@ export function Reader() {
   
   const [story, setStory] = useState<any>(null);
   const [ep, setEp] = useState<any>(null);
+  const [allEpisodes, setAllEpisodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scrollPercent, setScrollPercent] = useState(0);
@@ -44,6 +45,14 @@ export function Reader() {
         if (storyErr || !storyData) throw new Error('Hadithi haikupatikana.');
         setStory(storyData);
 
+        // Fetch all episodes for chapter navigation
+        const { data: epsList } = await supabase
+          .from('episodes')
+          .select('episode_number, title')
+          .eq('story_id', storyData.id)
+          .order('episode_number', { ascending: true });
+        if (epsList) setAllEpisodes(epsList);
+
         const { data: epData, error: epErr } = await supabase
           .from('episodes')
           .select('*')
@@ -64,16 +73,11 @@ export function Reader() {
         
         setNextEpExists(!!nextData);
 
-        // Paywall logic: First 3 episodes free. For episode 4+:
-        // Free if story price is 0, or user has purchased the story.
+        // Paywall logic
         const isPaidStory = (storyData.price ?? 1000) > 0;
         const isUnlocked = epData.episode_number <= 3 || !isPaidStory || hasPurchasedStory(storyData.id);
-        
-        if (!isUnlocked) {
-          setShowPaywall(true);
-        } else {
-          setShowPaywall(false);
-        }
+        setShowPaywall(!isUnlocked);
+
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -109,8 +113,9 @@ export function Reader() {
         user_id: user.id,
         story_id: story.id,
         episode_id: ep.id,
+        episode_number: ep.episode_number,
         percent: pct,
-      }, { onConflict: 'user_id,episode_id' }).then();
+      }, { onConflict: 'user_id,story_id' }).then(() => {});
     };
   }, [story?.id, epNumber, user]);
 
@@ -121,12 +126,16 @@ export function Reader() {
   }, [ep?.content, showPaywall]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-mist">Inapakia...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500 bg-white">
+        Inapakia...
+      </div>
+    );
   }
 
   if (error || !story || !ep) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6">
+      <div className="mx-auto max-w-2xl px-4 py-20 sm:px-6 bg-white">
         <ErrorState
           title="Sehemu hii haipatikani"
           body={error || "Sehemu unayotafuta haipo au bado haijatolewa."}
@@ -139,12 +148,75 @@ export function Reader() {
 
   const light = readerPrefs.mode === 'light';
 
+  /* ── Chapter navigation component (reused at top & bottom) ──────────────── */
+  const ChapterNav = ({ position }: { position: 'top' | 'bottom' }) => (
+    <nav
+      className={cn(
+        'flex items-center gap-2',
+        position === 'top'
+          ? 'mt-6 border-y py-3'
+          : 'mt-14 border-t pt-6',
+        light ? 'border-gray-100' : 'border-white/10'
+      )}
+      aria-label={`Urambazaji wa sehemu — ${position}`}
+    >
+      {/* Prev */}
+      {epNumber > 1 ? (
+        <Link
+          to={`/soma/${story.slug}/${epNumber - 1}`}
+          className={cn(
+            'inline-flex items-center gap-1.5 shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition-colors',
+            light
+              ? 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              : 'border-white/20 text-white/60 hover:bg-white/10 hover:text-white'
+          )}
+        >
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          Nyuma
+        </Link>
+      ) : <span className="w-[76px]" />}
+
+      {/* Chapter selector dropdown */}
+      {allEpisodes.length > 1 && (
+        <select
+          value={epNumber}
+          onChange={(e) => navigate(`/soma/${story.slug}/${e.target.value}`)}
+          aria-label="Chagua sehemu"
+          className={cn(
+            'flex-1 rounded-full border text-xs font-semibold px-3 py-2 text-center cursor-pointer transition-colors focus:outline-none min-w-0',
+            light
+              ? 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100 focus:border-[#9B1B3B]/40'
+              : 'border-white/20 bg-white/10 text-white focus:border-white/40'
+          )}
+        >
+          {allEpisodes.map((e) => (
+            <option key={e.episode_number} value={e.episode_number}>
+              Sehemu {e.episode_number}{e.title ? ` — ${e.title}` : ''}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {/* Next */}
+      {nextEpExists ? (
+        <Link
+          to={`/soma/${story.slug}/${epNumber + 1}`}
+          className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-[#9B1B3B] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C42B53]"
+        >
+          Mbele
+          <ArrowRightIcon className="h-3.5 w-3.5" />
+        </Link>
+      ) : <span className="w-[76px]" />}
+    </nav>
+  );
+
   return (
-    <div className={cn('min-h-screen w-full', light ? 'bg-paper text-ink' : 'bg-ink text-cream')}>
+    <div className={cn('min-h-screen w-full', light ? 'bg-white text-gray-900' : 'bg-[#0E0C0D] text-[#F6F0E8]')}>
+      {/* Sticky progress header */}
       <header
         className={cn(
           'sticky top-0 z-40 border-b backdrop-blur-md',
-          light ? 'border-black/10 bg-paper/95' : 'border-line bg-ink/95'
+          light ? 'border-gray-100 bg-white/95' : 'border-white/10 bg-[#0E0C0D]/95'
         )}
       >
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:px-6">
@@ -152,72 +224,86 @@ export function Reader() {
             to={`/hadithi/${story.slug}`}
             aria-label="Rudi kwenye hadithi"
             className={cn(
-              'grid h-9 w-9 place-items-center rounded-full transition-colors duration-150 ease-kisa',
-              light ? 'hover:bg-black/[0.06]' : 'hover:bg-surface-raised'
+              'grid h-9 w-9 place-items-center rounded-full transition-colors duration-150',
+              light ? 'hover:bg-gray-100' : 'hover:bg-white/10'
             )}
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
-          <Link to="/" className="font-display text-lg font-black tracking-[0.14em]">
+          <Link to="/" className={cn('font-display text-lg font-black tracking-[0.14em]', light ? 'text-[#9B1B3B]' : 'text-[#F6F0E8]')}>
             KISA
           </Link>
           <div className="mx-auto hidden min-w-0 text-center sm:block">
             <p className="truncate text-sm font-semibold">{story.title}</p>
-            <p className={cn('text-[11px]', light ? 'text-ink/60' : 'text-mist')}>
+            <p className={cn('text-[11px]', light ? 'text-gray-500' : 'text-gray-400')}>
               Sehemu ya {ep.episode_number} — {ep.title}
             </p>
           </div>
           <span
             className={cn(
               'ml-auto shrink-0 text-xs font-semibold tabular-nums',
-              light ? 'text-ink/60' : 'text-gold'
+              light ? 'text-gray-500' : 'text-[#C9A24A]'
             )}
           >
             {Math.round(scrollPercent)}%
           </span>
         </div>
-        <div className={cn('h-[3px] w-full', light ? 'bg-black/10' : 'bg-surface-high')}>
+        {/* Progress bar */}
+        <div className={cn('h-[3px] w-full', light ? 'bg-gray-100' : 'bg-white/10')}>
           <div
-            className="h-full bg-wine-bright transition-[width] duration-150 ease-linear"
+            className="h-full bg-[#9B1B3B] transition-[width] duration-150 ease-linear"
             style={{ width: `${scrollPercent}%` }}
           />
         </div>
       </header>
 
-      <div ref={articleRef} className="px-5 pb-40 pt-12 sm:px-8 sm:pt-16">
+      <div ref={articleRef} className="px-5 pb-40 pt-10 sm:px-8 sm:pt-14">
         <article
           className={cn(
             'mx-auto',
             readerPrefs.width === 'narrow' ? 'max-w-read' : 'max-w-[46rem]'
           )}
         >
-          <p className={cn('text-[11px] font-bold uppercase tracking-[0.2em]', light ? 'text-wine' : 'text-gold')}>
+          {/* Tags */}
+          <p className={cn('text-[11px] font-bold uppercase tracking-[0.2em]', light ? 'text-[#9B1B3B]' : 'text-[#C9A24A]')}>
             {(story.tags || []).join(' · ')}
           </p>
-          <h1 className="mt-3 font-display text-[30px] font-black uppercase leading-[1.08] tracking-wide sm:text-[40px]">
+
+          {/* Story title */}
+          <h1 className="mt-3 font-display text-[28px] font-black uppercase leading-[1.08] tracking-wide sm:text-[36px]">
             {story.title}
           </h1>
-          <h2 className={cn('mt-3 font-display text-xl font-semibold', light ? 'text-ink/70' : 'text-mist')}>
+
+          {/* Episode subtitle */}
+          <h2 className={cn('mt-2 font-display text-lg font-semibold', light ? 'text-gray-600' : 'text-gray-300')}>
             Sehemu ya {ep.episode_number} — {ep.title}
           </h2>
-          <p className={cn('mt-4 flex items-center gap-2 text-xs', light ? 'text-ink/50' : 'text-dust')}>
+
+          {/* Meta */}
+          <p className={cn('mt-3 flex items-center gap-2 text-xs', light ? 'text-gray-400' : 'text-gray-500')}>
             <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
             Dakika {ep.reading_minutes || 5} za kusoma · {story.authors?.name || story.author}
           </p>
 
+          {/* ── TOP Chapter Navigation ── */}
+          <ChapterNav position="top" />
+
+          {/* Divider */}
           <div
-            className={cn('mt-10 mb-10 h-px w-16', light ? 'bg-ink/20' : 'bg-gold/50')}
+            className={cn('mt-8 mb-8 h-px w-16', light ? 'bg-gray-200' : 'bg-[#C9A24A]/40')}
             aria-hidden="true"
           />
 
+          {/* YouTube embed if episode has video */}
           {ep.youtube_video_id && (
             <div className="mb-10">
               <YouTubeEmbed videoId={ep.youtube_video_id} />
             </div>
           )}
 
+          {/* Story body text */}
           <div
-            className="mt-10 font-read"
+            className="mt-10 font-read reader-body"
             style={{ fontSize: `${readerPrefs.fontSize}px`, lineHeight: 1.9 }}
           >
             {paragraphs.map((p: string, i: number) => (
@@ -225,7 +311,7 @@ export function Reader() {
                 key={i}
                 className={cn(
                   'mb-7',
-                  light ? 'text-ink/90' : 'text-cream/90',
+                  light ? 'text-gray-800' : 'text-[#F6F0E8]/90',
                   i === 0 && 'first-letter:float-left first-letter:mr-2 first-letter:font-display first-letter:text-[56px] first-letter:font-black first-letter:leading-[0.85]'
                 )}
               >
@@ -234,6 +320,7 @@ export function Reader() {
             ))}
           </div>
 
+          {/* Paywall or bottom navigation */}
           {showPaywall ? (
             <div className="mt-10">
               <SubscriptionExpiredModal
@@ -246,32 +333,10 @@ export function Reader() {
             </div>
           ) : (
             <>
-              <nav className="mt-14 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {epNumber > 1 ? (
-                  <Link
-                    to={`/soma/${story.slug}/${epNumber - 1}`}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-semibold transition-colors duration-150 ease-kisa',
-                      light ? 'border-black/10 hover:bg-black/[0.05]' : 'border-line hover:border-mist/50'
-                    )}
-                  >
-                    <ArrowLeftIcon className="h-4 w-4" />
-                    Sehemu ya {epNumber - 1}
-                  </Link>
-                ) : <span />}
-                
-                {nextEpExists && (
-                  <Link
-                    to={`/soma/${story.slug}/${epNumber + 1}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-wine px-6 py-3 text-sm font-semibold text-cream transition-colors duration-150 ease-kisa hover:bg-wine-bright"
-                  >
-                    Sehemu inayofuata
-                    <ArrowRightIcon className="h-4 w-4" />
-                  </Link>
-                )}
-              </nav>
+              {/* ── BOTTOM Chapter Navigation ── */}
+              <ChapterNav position="bottom" />
 
-              <div className="mt-16 border-t border-line/30 pt-8">
+              <div className={cn('mt-16 border-t pt-8', light ? 'border-gray-100' : 'border-white/10')}>
                 <RatingWidget episodeId={ep.id} storyId={story.id} />
               </div>
               <div className="mt-8">
