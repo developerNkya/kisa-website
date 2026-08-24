@@ -3,6 +3,7 @@ import { BookOpen, Lock, X, Check, Smartphone, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
 import { SubscriptionPaymentModal } from './SubscriptionPaymentModal';
+import { track } from '../lib/pixel'; // ✅ Add this import
 
 interface SubscriptionExpiredModalProps {
   storyId?: string;
@@ -46,6 +47,15 @@ export function SubscriptionExpiredModal({
       return;
     }
 
+    // ✅ Track payment initiation
+    if (storyId) {
+      track.initiateCheckout({
+        id: storyId,
+        title: storyTitle,
+        price: price,
+      });
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/story/pay', {
@@ -79,6 +89,16 @@ export function SubscriptionExpiredModal({
   const handleFinishPayment = async () => {
     setShowPaymentModal(false);
     await refreshPurchases();
+    
+    // ✅ Track successful purchase
+    if (storyId) {
+      track.purchase({
+        id: storyId,
+        title: storyTitle,
+        price: price,
+      });
+    }
+    
     if (onSuccess) onSuccess();
     else window.location.reload();
   };

@@ -11,6 +11,7 @@ import { YouTubeEmbed } from '../components/reader/YouTubeEmbed';
 import { CommentsSection } from '../components/CommentsSection';
 import { RatingWidget } from '../components/RatingWidget';
 import { cn } from '../utils/cn';
+import { track } from '../lib/pixel'; // ✅ Add this import
 
 export function Reader() {
   const { slug, episode } = useParams();
@@ -90,6 +91,17 @@ export function Reader() {
     }
     loadData();
   }, [slug, epNumber, hasPurchasedStory]);
+
+  // ✅ Track when user starts reading an episode
+  useEffect(() => {
+    if (ep && story && !showPaywall) {
+      track.startReading({
+        id: story.id,
+        title: story.title,
+        episodeNumber: ep.episode_number,
+      });
+    }
+  }, [ep, story, showPaywall]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -223,6 +235,12 @@ export function Reader() {
     // Handle click on episode - show payment modal for locked episodes
     const handleEpisodeClick = (pageNum: number) => {
       if (isEpisodeLocked(pageNum)) {
+        // ✅ Track locked episode click
+        track.lockedEpisodeClick({
+          id: story.id,
+          title: story.title,
+          episodeNumber: pageNum,
+        });
         // Show payment modal instead of navigating
         setShowPaywall(true);
         return;
@@ -467,7 +485,7 @@ export function Reader() {
               <SubscriptionExpiredModal
                 storyId={story.id}
                 storyTitle={story.title}
-                storyCover={story.cover_url} // ✅ Added cover image
+                storyCover={story.cover_url}
                 price={story.price || 1000}
                 onClose={() => setShowPaywall(false)}
                 onSuccess={() => setShowPaywall(false)}

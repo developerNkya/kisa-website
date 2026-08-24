@@ -5,6 +5,7 @@ import { Story } from '../types';
 import { useAuth } from '../lib/AuthContext';
 import { swahiliDate } from '../utils/format';
 import { cn } from '../utils/cn';
+import { track } from '../lib/pixel'; // ✅ Add this import
 
 interface EpisodeListProps {
   story: Story;
@@ -39,6 +40,13 @@ export function EpisodeList({ story, initialCount = 8, onEpisodeClick }: Episode
     const accessible = canAccessEpisode(episode);
     
     if (accessible) {
+      // ✅ Track free episode click
+      track.startReading({
+        id: story.id,
+        title: story.title,
+        episodeNumber: episode.number,
+      });
+      
       // If click handler provided, use it
       if (onEpisodeClick) {
         onEpisodeClick(episode.number);
@@ -47,6 +55,13 @@ export function EpisodeList({ story, initialCount = 8, onEpisodeClick }: Episode
         window.location.href = `/soma/${story.slug}/${episode.number}`;
       }
     } else {
+      // ✅ Track locked episode click
+      track.lockedEpisodeClick({
+        id: story.id,
+        title: story.title,
+        episodeNumber: episode.number,
+      });
+      
       // Locked - trigger payment modal via parent
       if (onEpisodeClick) {
         onEpisodeClick(episode.number);
@@ -139,7 +154,7 @@ export function EpisodeList({ story, initialCount = 8, onEpisodeClick }: Episode
                       status.className
                     )}>
                       {status.icon}
-                      
+                      Nunua
                     </span>
                   )}
                 </div>

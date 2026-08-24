@@ -11,6 +11,7 @@ import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
 import { readingLabel, totalMinutes } from '../utils/format';
 import { SubscriptionExpiredModal } from '../components/SubscriptionExpiredModal';
+import { track } from '../lib/pixel'; // ✅ Add this import
 
 export function StoryDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -75,6 +76,18 @@ export function StoryDetail() {
     }
     loadData();
   }, [slug, user]);
+
+  // ✅ Track story view when story loads
+  useEffect(() => {
+    if (story) {
+      track.viewContent({
+        id: story.id,
+        title: story.title,
+        price: story.price || 1000,
+        category: story.categories?.name,
+      });
+    }
+  }, [story]);
 
   // 🔍 Smart access check - checks episode is_free, story price, and purchase status
   const canAccessEpisode = (episodeNumber: number) => {
@@ -150,6 +163,13 @@ export function StoryDetail() {
       // Navigate to reader
       window.location.href = `/soma/${story.slug}/${episodeNumber}`;
     } else {
+      // ✅ Track locked episode click
+      track.lockedEpisodeClick({
+        id: story.id,
+        title: story.title,
+        episodeNumber: episodeNumber,
+      });
+      
       // Show payment modal
       setSelectedEpisode(episodeNumber);
       setShowPaywallModal(true);
