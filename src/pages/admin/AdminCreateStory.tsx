@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ImageIcon, Loader2Icon } from 'lucide-react';
+import { ImageIcon, Loader2Icon, InfoIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { AdminPanel } from '../../components/admin/AdminTable';
@@ -118,6 +118,8 @@ export function AdminCreateStory() {
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const categoryName = categories.find(c => c.id === categoryId)?.name || 'Category';
+  const isFree = price === 0;
+  const isPremium = price > 0;
 
   return (
     <div className="space-y-5">
@@ -199,7 +201,29 @@ export function AdminCreateStory() {
                     placeholder="1000"
                     required
                     className={inputClass} />
-                  <p className="mt-1 text-[11px] text-zinc-500">Sehemu 3 za kwanza ni bure.</p>
+                  
+                  {/* 🔍 Improved help text based on price */}
+                  <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-zinc-800/50 bg-zinc-900/30 px-2.5 py-1.5">
+                    <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                    <div className="text-[11px] text-zinc-400 leading-relaxed">
+                      {isFree ? (
+                        <>
+                          <span className="text-green-400 font-medium">Bure</span> — 
+                          Sehemu zote za hadithi hii zitakuwa wazi kwa wasomaji wote.
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-amber-400 font-medium">Premium</span> — 
+                          Sehemu <strong>1-3</strong> zitakuwa bure, sehemu zingine 
+                          zitahitaji ununuzi wa TSh {price.toLocaleString()}.
+                          <br />
+                          <span className="text-zinc-500 text-[10px]">
+                            💡 Unaweza kubadilisha sehemu binafsi kwenye mhariri wa sehemu.
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -294,8 +318,22 @@ export function AdminCreateStory() {
                     )}
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent" />
+                  
+                  {/* Premium/Free badge on preview */}
+                  <div className="absolute left-2 top-2">
+                    {isPremium ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold uppercase text-black">
+                        Premium
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded bg-green-500/90 px-2 py-0.5 text-[10px] font-bold uppercase text-black">
+                        Bure
+                      </span>
+                    )}
+                  </div>
+                  
                   {isOriginal && (
-                    <div className="absolute left-2 top-2">
+                    <div className="absolute right-2 top-2">
                       <PremiumBadge />
                     </div>
                   )}
@@ -303,7 +341,10 @@ export function AdminCreateStory() {
                 <p className="mt-2.5 font-display text-sm font-bold text-cream">
                   {title || 'Kichwa cha hadithi'}
                 </p>
-                <p className="text-xs text-mist">{categoryName} · TZS {price.toLocaleString()}</p>
+                <p className="text-xs text-mist">
+                  {categoryName} 
+                  {isPremium ? ` · TSh ${price.toLocaleString()}` : ' · Bure'}
+                </p>
               </div>
             </div>
           </AdminPanel>

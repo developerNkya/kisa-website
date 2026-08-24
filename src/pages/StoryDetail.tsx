@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookOpenIcon, ClockIcon, StarIcon, LockIcon } from 'lucide-react';
+import { BookOpenIcon, ClockIcon, StarIcon, LockIcon, UnlockIcon } from 'lucide-react';
 import { EpisodeList } from '../components/EpisodeList';
 import { StoryRail } from '../components/StoryRail';
 import { ButtonLink } from '../components/ui/Button';
@@ -10,6 +10,7 @@ import { RatingWidget } from '../components/RatingWidget';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
 import { readingLabel, totalMinutes } from '../utils/format';
+import { SubscriptionExpiredModal } from '../components/SubscriptionExpiredModal';
 
 export function StoryDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -21,6 +22,7 @@ export function StoryDetail() {
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [selectedEpisode, setSelectedEpisode] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -74,17 +76,23 @@ export function StoryDetail() {
     loadData();
   }, [slug, user]);
 
-  // Check if user can access a specific episode
+  // 🔍 Smart access check - checks episode is_free, story price, and purchase status
   const canAccessEpisode = (episodeNumber: number) => {
-    // First 3 episodes are always free
-    if (episodeNumber <= 3) return true;
+    // Find the episode
+    const episode = episodes.find(e => e.episode_number === episodeNumber);
     
-    // If story is free, all episodes are accessible
+    // 1️⃣ PRIMARY RULE: Check episode's is_free field (Database source of truth)
+    if (episode?.is_free === true) return true;
+    
+    // 2️⃣ If story is free (price = 0), all episodes are free
     const isPaidStory = (story?.price ?? 1000) > 0;
     if (!isPaidStory) return true;
     
-    // Check if user has purchased the story
-    return hasPurchasedStory(story?.id);
+    // 3️⃣ If user purchased, all episodes are accessible
+    if (hasPurchasedStory(story?.id)) return true;
+    
+    // 4️⃣ Everything else is locked
+    return false;
   };
 
   // Get the next unlocked episode for the "Continue Reading" button
@@ -127,11 +135,26 @@ export function StoryDetail() {
   const isPurchased = hasPurchasedStory(story?.id);
   const storyPrice = story?.price ?? 1000;
   const isPaidStory = storyPrice > 0;
-  const hasFreeEpisodes = episodes.some(e => e.episode_number <= 3);
-  const allEpisodesLocked = !hasFreeEpisodes && !isPurchased;
+  const isFreeStory = storyPrice === 0;
+  
+  // Check if there are any free episodes
+  const hasFreeEpisodes = episodes.some(e => canAccessEpisode(e.episode_number));
+  const allEpisodesLocked = !hasFreeEpisodes;
 
   const minutes = totalMinutes(episodes.map((e) => e.reading_minutes || 5));
   const tags = story?.tags || [];
+
+  // Handle episode click from EpisodeList
+  const handleEpisodeClick = (episodeNumber: number) => {
+    if (canAccessEpisode(episodeNumber)) {
+      // Navigate to reader
+      window.location.href = `/soma/${story.slug}/${episodeNumber}`;
+    } else {
+      // Show payment modal
+      setSelectedEpisode(episodeNumber);
+      setShowPaywallModal(true);
+    }
+  };
 
   // Enhanced story object with premium info
   const storyObj = {
@@ -141,9 +164,10 @@ export function StoryDetail() {
       number: e.episode_number,
       readingMinutes: e.reading_minutes || 5,
       publishedAt: e.published_at || e.created_at,
-      premium: isPaidStory && !isPurchased && e.episode_number > 3,
-      locked: isPaidStory && !isPurchased && e.episode_number > 3,
-      accessible: canAccessEpisode(e.episode_number)
+      premium: isPaidStory && !isPurchased && !e.is_free && e.episode_number > 3,
+      locked: !canAccessEpisode(e.episode_number),
+      accessible: canAccessEpisode(e.episode_number),
+      onClick: () => handleEpisodeClick(e.episode_number) // Pass click handler
     }))
   };
 
@@ -205,11 +229,16 @@ export function StoryDetail() {
               Mwandishi: <span className="font-semibold text-gray-800">{story.authors?.name || 'Mwandishi wa KISA'}</span>
             </p>
 
-            {/* Premium badge */}
-            {isPaidStory && (
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#9B1B3B]/10 px-3 py-1 text-xs font-semibold text-[#9B1B3B]">
+            {/* Premium/Free badge with price integrated */}
+            {isFreeStory ? (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-600">
+                <UnlockIcon className="h-3 w-3" />
+                Bure
+              </div>
+            ) : isPaidStory && (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#9B1B3B]/10 px-3 py-1 text-xs font-semibold text-[#9B1B3B]">
                 <LockIcon className="h-3 w-3" />
-                {isPurchased ? 'Umeweza Kufungua' : 'Hadithi ya Malipo'}
+                {isPurchased ? 'Imelipiwa' : `Haijalipiwa · TSh ${storyPrice.toLocaleString()}`}
               </div>
             )}
 
@@ -219,7 +248,7 @@ export function StoryDetail() {
               </p>
             )}
 
-            {/* Micro Stats */}
+            {/* Micro Stats - removed price from here */}
             <div className="mt-4 flex flex-wrap justify-center md:justify-start items-center gap-x-4 gap-y-1.5 text-xs text-gray-500">
               <span className="inline-flex items-center gap-1">
                 <StarIcon className="h-3.5 w-3.5 fill-[#C9A24A] text-[#C9A24A]" />
@@ -289,7 +318,7 @@ export function StoryDetail() {
           </section>
 
           {/* Chapter Episodes List - Pass the enhanced story object */}
-          <EpisodeList story={storyObj} />
+          <EpisodeList story={storyObj} onEpisodeClick={handleEpisodeClick} />
           
           {/* Ratings & Comments */}
           <div className="grid gap-10 pt-4 border-t border-gray-100 md:grid-cols-2">
@@ -308,6 +337,26 @@ export function StoryDetail() {
         <div className="mt-16 border-t border-gray-100 pt-10">
           <StoryRail title="Hadithi zinazofanana" stories={related.map(s => ({...s, cover: s.cover_url}))} href="/hadithi" />
         </div>
+      )}
+
+      {/* Paywall Modal */}
+      {showPaywallModal && (
+        <SubscriptionExpiredModal
+          storyId={story.id}
+          storyTitle={story.title}
+          storyCover={story.cover_url}
+          price={story.price || 1000}
+          onClose={() => {
+            setShowPaywallModal(false);
+            setSelectedEpisode(null);
+          }}
+          onSuccess={() => {
+            setShowPaywallModal(false);
+            setSelectedEpisode(null);
+            // Refresh the page to update access
+            window.location.reload();
+          }}
+        />
       )}
     </article>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BoldIcon, ItalicIcon, ListIcon, QuoteIcon, Redo2Icon, Undo2Icon, Loader2Icon } from 'lucide-react';
+import { BoldIcon, ItalicIcon, ListIcon, QuoteIcon, Redo2Icon, Undo2Icon, Loader2Icon, InfoIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, Navigate, useParams } from 'react-router-dom';
 import { AdminPanel } from '../../components/admin/AdminTable';
@@ -42,6 +42,9 @@ export function AdminEditEpisode() {
   const [status, setStatus] = useState('draft');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Store story price for context
+  const [storyPrice, setStoryPrice] = useState<number>(1000);
 
   const words = content.trim() ? content.trim().split(/\s+/).length : 0;
   const minutes = Math.max(1, Math.round(words / 180));
@@ -55,7 +58,7 @@ export function AdminEditEpisode() {
     try {
       const [epRes, stRes] = await Promise.all([
         supabase.from('episodes').select('*').eq('id', id).single(),
-        supabase.from('stories').select('id, title').order('title'),
+        supabase.from('stories').select('id, title, price').order('title'),
       ]);
 
       if (epRes.error || !epRes.data) throw new Error('Episode not found');
@@ -69,13 +72,30 @@ export function AdminEditEpisode() {
       setIsFree(ep.is_free ?? true);
       setStatus(ep.status || 'draft');
 
-      if (stRes.data) setStories(stRes.data);
+      if (stRes.data) {
+        setStories(stRes.data);
+        // Find the story price
+        const story = stRes.data.find(s => s.id === ep.story_id);
+        if (story) {
+          setStoryPrice(story.price || 1000);
+        }
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to load episode');
     } finally {
       setLoading(false);
     }
   }
+
+  // When story changes, update the price
+  const handleStoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setStoryId(id);
+    const story = stories.find(s => s.id === id);
+    if (story) {
+      setStoryPrice(story.price || 1000);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +134,20 @@ export function AdminEditEpisode() {
   if (loading) return <div className="flex h-40 items-center justify-center text-mist">Inapakia...</div>;
 
   const selectedStoryTitle = stories.find(s => s.id === storyId)?.title || 'Story';
+  const epNum = parseInt(number, 10);
+  const isStoryFree = storyPrice === 0;
+  const isDefaultFree = isStoryFree || (epNum <= 3);
+
+  // Helper text for the access section
+  const getAccessHelperText = () => {
+    if (isStoryFree) {
+      return '📖 Hadithi hii ni bure - sehemu zote zipo wazi';
+    }
+    if (epNum <= 3) {
+      return '✅ Sehemu za 1-3 ni bure kwa default (hadithi ya malipo)';
+    }
+    return '🔒 Sehemu hii ni premium kwa default (hadithi ya malipo)';
+  };
 
   return (
     <div className="space-y-5">
@@ -128,17 +162,41 @@ export function AdminEditEpisode() {
             <div className="grid gap-4 p-4 sm:grid-cols-[1fr_100px] sm:p-5">
               <div>
                 <label htmlFor="ep-story" className={labelClass}>Story</label>
-                <select id="ep-story" value={storyId} onChange={e => setStoryId(e.target.value)} required className={inputClass}>
-                  {stories.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                <select 
+                  id="ep-story" 
+                  value={storyId} 
+                  onChange={handleStoryChange} 
+                  required 
+                  className={inputClass}
+                >
+                  {stories.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} {s.price > 0 ? `(TSh ${s.price.toLocaleString()})` : '(Bure)'}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label htmlFor="ep-number" className={labelClass}>Number</label>
-                <input id="ep-number" type="number" min="1" value={number} onChange={e => setNumber(e.target.value)} required className={inputClass} />
+                <input 
+                  id="ep-number" 
+                  type="number" 
+                  min="1" 
+                  value={number} 
+                  onChange={e => setNumber(e.target.value)} 
+                  required 
+                  className={inputClass} 
+                />
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="ep-title" className={labelClass}>Episode title (hiari)</label>
-                <input id="ep-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Ndoto Mbaya" className={inputClass} />
+                <input 
+                  id="ep-title" 
+                  value={title} 
+                  onChange={e => setTitle(e.target.value)} 
+                  placeholder="Ndoto Mbaya" 
+                  className={inputClass} 
+                />
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="ep-youtube" className={labelClass}>YouTube Video ID (hiari)</label>
@@ -147,7 +205,8 @@ export function AdminEditEpisode() {
                   value={youtubeVideoId}
                   onChange={e => setYoutubeVideoId(extractYoutubeId(e.target.value))}
                   placeholder="e.g. dQw4w9WgXcQ au https://youtu.be/..."
-                  className={inputClass} />
+                  className={inputClass} 
+                />
                 <p className="mt-1 text-xs text-zinc-500">Weka ID au URL kamili ya YouTube — itachanganuliwa kiotomatiki.</p>
               </div>
             </div>
@@ -170,7 +229,8 @@ export function AdminEditEpisode() {
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 required
-                className={cn(inputClass, 'resize-y font-read text-[15px] leading-[1.85] text-zinc-200')} />
+                className={cn(inputClass, 'resize-y font-read text-[15px] leading-[1.85] text-zinc-200')} 
+              />
             </div>
           </AdminPanel>
         </div>
@@ -182,19 +242,58 @@ export function AdminEditEpisode() {
                 <label htmlFor="ep-minutes" className={labelClass}>Reading time</label>
                 <input id="ep-minutes" readOnly value={`Dakika ${minutes}`} className={inputClass} />
               </div>
+              
               <div>
                 <span className={labelClass}>Access</span>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setIsFree(true)}
-                    className={cn('flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors', isFree ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100')}>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsFree(true)}
+                    className={cn(
+                      'flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors',
+                      isFree 
+                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' 
+                        : 'border-zinc-800 text-zinc-400 hover:text-zinc-100'
+                    )}
+                  >
                     Free
                   </button>
-                  <button type="button" onClick={() => setIsFree(false)}
-                    className={cn('flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors', !isFree ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100')}>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsFree(false)}
+                    className={cn(
+                      'flex-1 rounded-md border px-3 py-2 text-sm font-semibold transition-colors',
+                      !isFree 
+                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' 
+                        : 'border-zinc-800 text-zinc-400 hover:text-zinc-100'
+                    )}
+                  >
                     Premium
                   </button>
                 </div>
+                
+                {/* 🔍 Helper text showing context */}
+                <div className="mt-2 flex items-start gap-1.5 rounded-md border border-zinc-800/50 bg-zinc-900/30 px-2.5 py-1.5">
+                  <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                  <div className="text-[11px] text-zinc-400 leading-relaxed">
+                    {getAccessHelperText()}
+                    {!isStoryFree && storyPrice > 0 && (
+                      <br />
+                    )}
+                    {!isStoryFree && storyPrice > 0 && (
+                      <span className="text-zinc-500 text-[10px]">
+                        💰 Bei ya hadithi: TSh {storyPrice.toLocaleString()}
+                      </span>
+                    )}
+                    {!isStoryFree && storyPrice > 0 && epNum > 3 && (
+                      <span className="block text-zinc-500 text-[10px]">
+                        💡 Unaweza kubadilisha sehemu hii kuwa bure ikiwa unataka
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
+              
               <div>
                 <label htmlFor="ep-status" className={labelClass}>Status</label>
                 <select id="ep-status" value={status} onChange={e => setStatus(e.target.value)} className={inputClass}>
@@ -207,7 +306,8 @@ export function AdminEditEpisode() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex justify-center items-center gap-2 rounded-md bg-wine px-4 py-2.5 text-sm font-semibold text-cream hover:bg-wine-bright disabled:opacity-50">
+                  className="flex justify-center items-center gap-2 rounded-md bg-wine px-4 py-2.5 text-sm font-semibold text-cream hover:bg-wine-bright disabled:opacity-50"
+                >
                   {isSubmitting && <Loader2Icon className="h-4 w-4 animate-spin" />}
                   Update Episode
                 </button>
@@ -218,9 +318,17 @@ export function AdminEditEpisode() {
           <AdminPanel title="Reader preview">
             <div className="p-4 sm:p-5">
               <div className="rounded-md border border-line-soft bg-ink p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold">{selectedStoryTitle}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold">
+                  {selectedStoryTitle}
+                  {storyPrice > 0 ? ` · TSh ${storyPrice.toLocaleString()}` : ' · Bure'}
+                </p>
                 <p className="mt-1.5 font-display text-lg font-bold text-cream">
                   Sehemu ya {number} {title ? `— ${title}` : ''}
+                  {isFree ? (
+                    <span className="ml-2 text-xs font-normal text-green-400">(Bure)</span>
+                  ) : (
+                    <span className="ml-2 text-xs font-normal text-amber-400">(Premium)</span>
+                  )}
                 </p>
                 <p className="mt-3 line-clamp-6 font-read text-[13px] leading-[1.8] text-cream/80">
                   {content || 'Hakuna yaliyomo bado...'}

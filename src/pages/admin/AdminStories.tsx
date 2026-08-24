@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { PlusIcon, Loader2Icon } from 'lucide-react';
+import { PlusIcon, Loader2Icon, LockIcon, UnlockIcon, InfoIcon } from 'lucide-react';
 import { AdminPanel, AdminTable, StatusPill, Td } from '../../components/admin/AdminTable';
 import { compact } from '../../utils/format';
 import { cn } from '../../utils/cn';
@@ -79,12 +79,23 @@ export function AdminStories() {
     return true;
   });
 
+  // Count premium vs free stories
+  const premiumCount = stories.filter(s => s.price > 0).length;
+  const freeCount = stories.length - premiumCount;
+
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-zinc-50">Stories</h1>
-          <p className="mt-1 text-sm text-zinc-500">{stories.length} stories total</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            {stories.length} stories total
+            {stories.length > 0 && (
+              <span className="ml-2 text-zinc-600">
+                · {freeCount} free · {premiumCount} premium
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <input
@@ -126,47 +137,119 @@ export function AdminStories() {
             <Loader2Icon className="h-6 w-6 animate-spin text-wine" />
           </div>
         ) : (
-          <AdminTable columns={['Cover & Title', 'Author & Category', 'Price', 'Episodes', 'Status', 'Views', 'Actions']}>
-            {filtered.map((s) => (
-              <tr key={s.id} className="hover:bg-zinc-900/50">
-                <Td>
-                  <div className="flex items-center gap-3">
-                    {s.cover_url && (
-                      <img src={s.cover_url} alt="" className="h-10 w-7 rounded object-cover" />
-                    )}
-                    <span className="font-medium text-zinc-100">{s.title}</span>
-                  </div>
-                </Td>
-                <Td>
-                  <div className="flex flex-col">
-                    <span className="text-zinc-100">{s.authors?.name}</span>
-                    <span className="text-xs text-zinc-500">{s.categories?.name}</span>
-                  </div>
-                </Td>
-                <Td className="tabular-nums font-semibold text-gold">
-                  {s.price > 0 ? `TZS ${(s.price || 1000).toLocaleString()}` : 'Bure'}
-                </Td>
-                <Td className="tabular-nums">{s.episodes?.[0]?.count || 0}</Td>
-                <Td>
-                  <StatusPill status={s.status.charAt(0).toUpperCase() + s.status.slice(1)} />
-                </Td>
-                <Td className="tabular-nums">{compact(s.total_reads || 0)}</Td>
-                <Td>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Link to={`/hadithi/${s.slug}`} target="_blank" className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">View</Link>
-                    <Link to={`/admin/stories/${s.id}/edit`} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">Edit</Link>
-                    <button onClick={() => toggleStatus(s)} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">
-                      {s.status === 'published' ? 'Unpublish' : 'Publish'}
-                    </button>
-                    <button onClick={() => handleDelete(s.id)} className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-red-400 hover:border-red-500 hover:text-red-300">Delete</button>
-                  </div>
-                </Td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><Td colSpan={7} className="text-center py-4">No stories found</Td></tr>
-            )}
-          </AdminTable>
+          <>
+            <AdminTable columns={['Cover & Title', 'Author & Category', 'Price', 'Access', 'Episodes', 'Status', 'Views', 'Actions']}>
+              {filtered.map((s) => {
+                const isPremium = s.price > 0;
+                const isFree = s.price === 0;
+                
+                return (
+                  <tr key={s.id} className="hover:bg-zinc-900/50">
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        {s.cover_url && (
+                          <img src={s.cover_url} alt="" className="h-10 w-7 rounded object-cover" />
+                        )}
+                        <span className="font-medium text-zinc-100">{s.title}</span>
+                      </div>
+                    </Td>
+                    <Td>
+                      <div className="flex flex-col">
+                        <span className="text-zinc-100">{s.authors?.name}</span>
+                        <span className="text-xs text-zinc-500">{s.categories?.name}</span>
+                      </div>
+                    </Td>
+                    <Td className="tabular-nums font-semibold">
+                      {isFree ? (
+                        <span className="text-green-400">Bure</span>
+                      ) : (
+                        <span className="text-gold">TSh {s.price.toLocaleString()}</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <div className="flex items-center gap-1.5">
+                        {isPremium ? (
+                          <>
+                            <LockIcon className="h-3.5 w-3.5 text-amber-400" />
+                            <span className="text-xs text-amber-400 font-medium">Premium</span>
+                            <span className="group relative cursor-help">
+                              <InfoIcon className="h-3 w-3 text-zinc-500" />
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden whitespace-nowrap rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-200 group-hover:block">
+                                Sehemu 1-3 bure, zingine premium
+                              </span>
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <UnlockIcon className="h-3.5 w-3.5 text-green-400" />
+                            <span className="text-xs text-green-400 font-medium">Free</span>
+                            <span className="group relative cursor-help">
+                              <InfoIcon className="h-3 w-3 text-zinc-500" />
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden whitespace-nowrap rounded bg-zinc-800 px-2 py-1 text-[10px] text-zinc-200 group-hover:block">
+                                Sehemu zote ni bure
+                              </span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </Td>
+                    <Td className="tabular-nums">{s.episodes?.[0]?.count || 0}</Td>
+                    <Td>
+                      <StatusPill status={s.status.charAt(0).toUpperCase() + s.status.slice(1)} />
+                    </Td>
+                    <Td className="tabular-nums">{compact(s.total_reads || 0)}</Td>
+                    <Td>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Link 
+                          to={`/hadithi/${s.slug}`} 
+                          target="_blank" 
+                          className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">
+                          View
+                        </Link>
+                        <Link 
+                          to={`/admin/stories/${s.id}/edit`} 
+                          className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">
+                          Edit
+                        </Link>
+                        <button 
+                          onClick={() => toggleStatus(s)} 
+                          className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-zinc-500 hover:text-zinc-50">
+                          {s.status === 'published' ? 'Unpublish' : 'Publish'}
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(s.id)} 
+                          className="rounded border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-red-400 hover:border-red-500 hover:text-red-300">
+                          Delete
+                        </button>
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><Td colSpan={8} className="text-center py-4 text-zinc-500">No stories found</Td></tr>
+              )}
+            </AdminTable>
+
+            {/* Legend for access status */}
+            <div className="mt-4 border-t border-zinc-800 pt-4 px-4 pb-2">
+              <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
+                <span className="font-medium text-zinc-400">Access Legend:</span>
+                <span className="flex items-center gap-1">
+                  <UnlockIcon className="h-3 w-3 text-green-400" />
+                  Free — All episodes accessible to all
+                </span>
+                <span className="flex items-center gap-1">
+                  <LockIcon className="h-3 w-3 text-amber-400" />
+                  Premium — First 3 episodes free, rest require purchase
+                </span>
+                <span className="flex items-center gap-1 text-zinc-600">
+                  <InfoIcon className="h-3 w-3" />
+                  Hover for details
+                </span>
+              </div>
+            </div>
+          </>
         )}
       </AdminPanel>
     </div>

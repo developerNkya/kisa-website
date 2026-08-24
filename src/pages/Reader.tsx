@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftIcon, ArrowRightIcon, ClockIcon } from 'lucide-react';
+import { ArrowLeftIcon, ArrowRightIcon, ClockIcon, LockIcon, UnlockIcon } from 'lucide-react';
 import { useKisa } from '../contexts/KisaContext';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -48,7 +48,7 @@ export function Reader() {
         // Fetch all episodes for chapter navigation
         const { data: epsList } = await supabase
           .from('episodes')
-          .select('episode_number, title')
+          .select('episode_number, title, is_free')
           .eq('story_id', storyData.id)
           .order('episode_number', { ascending: true });
         if (epsList) setAllEpisodes(epsList);
@@ -73,9 +73,13 @@ export function Reader() {
         
         setNextEpExists(!!nextData);
 
-        // Paywall logic
+        // 🔍 Smart paywall logic
         const isPaidStory = (storyData.price ?? 1000) > 0;
-        const isUnlocked = epData.episode_number <= 3 || !isPaidStory || hasPurchasedStory(storyData.id);
+        const isPurchased = hasPurchasedStory(storyData.id);
+        const isEpisodeFree = epData.is_free === true;
+        
+        // Check if user can access this episode
+        const isUnlocked = isEpisodeFree || !isPaidStory || isPurchased;
         setShowPaywall(!isUnlocked);
 
       } catch (err: any) {
@@ -125,6 +129,25 @@ export function Reader() {
     return showPaywall ? split.slice(0, 3) : split;
   }, [ep?.content, showPaywall]);
 
+  // 🔍 Smart check if episode is locked
+  const isEpisodeLocked = (episodeNum: number) => {
+    // Find the episode
+    const episode = allEpisodes.find(e => e.episode_number === episodeNum);
+    
+    // 1️⃣ PRIMARY RULE: Check episode's is_free field (Database source of truth)
+    if (episode?.is_free === true) return false;
+    
+    // 2️⃣ If story is free (price = 0), all episodes are free
+    const isPaidStory = (story?.price ?? 1000) > 0;
+    if (!isPaidStory) return false;
+    
+    // 3️⃣ If user purchased, all episodes are accessible
+    if (hasPurchasedStory(story?.id)) return false;
+    
+    // 4️⃣ Everything else is locked
+    return true;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500 bg-white">
@@ -147,68 +170,165 @@ export function Reader() {
   }
 
   const light = readerPrefs.mode === 'light';
+  const isPaidStory = (story?.price ?? 1000) > 0;
+  const isPurchased = hasPurchasedStory(story?.id);
+  const isFreeStory = story?.price === 0;
 
   /* ── Chapter navigation component (reused at top & bottom) ──────────────── */
-  const ChapterNav = ({ position }: { position: 'top' | 'bottom' }) => (
-    <nav
-      className={cn(
-        'flex items-center gap-2',
-        position === 'top'
-          ? 'mt-6 border-y py-3'
-          : 'mt-14 border-t pt-6',
-        light ? 'border-gray-100' : 'border-white/10'
-      )}
-      aria-label={`Urambazaji wa sehemu — ${position}`}
-    >
-      {/* Prev */}
-      {epNumber > 1 ? (
-        <Link
-          to={`/soma/${story.slug}/${epNumber - 1}`}
-          className={cn(
-            'inline-flex items-center gap-1.5 shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition-colors',
-            light
-              ? 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              : 'border-white/20 text-white/60 hover:bg-white/10 hover:text-white'
-          )}
-        >
-          <ArrowLeftIcon className="h-3.5 w-3.5" />
-          Nyuma
-        </Link>
-      ) : <span className="w-[76px]" />}
+  const ChapterNav = ({ position }: { position: 'top' | 'bottom' }) => {
+    // Check if a specific episode is locked (premium)
+    const isEpisodeLocked = (episodeNum: number) => {
+      // Find the episode
+      const episode = allEpisodes.find(e => e.episode_number === episodeNum);
+      
+      // 1️⃣ PRIMARY RULE: Check episode's is_free field
+      if (episode?.is_free === true) return false;
+      
+      // 2️⃣ If story is free, all episodes are free
+      const isPaidStory = (story?.price ?? 1000) > 0;
+      if (!isPaidStory) return false;
+      
+      // 3️⃣ User has purchased the story
+      if (hasPurchasedStory(story?.id)) return false;
+      
+      return true; // Locked
+    };
 
-      {/* Chapter selector dropdown */}
-      {allEpisodes.length > 1 && (
-        <select
-          value={epNumber}
-          onChange={(e) => navigate(`/soma/${story.slug}/${e.target.value}`)}
-          aria-label="Chagua sehemu"
-          className={cn(
-            'flex-1 rounded-full border text-xs font-semibold px-3 py-2 text-center cursor-pointer transition-colors focus:outline-none min-w-0',
-            light
-              ? 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100 focus:border-[#9B1B3B]/40'
-              : 'border-white/20 bg-white/10 text-white focus:border-white/40'
-          )}
-        >
-          {allEpisodes.map((e) => (
-            <option key={e.episode_number} value={e.episode_number}>
-              Sehemu {e.episode_number}{e.title ? ` — ${e.title}` : ''}
-            </option>
-          ))}
-        </select>
-      )}
+    // Get visible page numbers (show current, 2 before, 2 after)
+    const getVisiblePages = () => {
+      const total = allEpisodes.length;
+      const current = epNumber;
+      let start = Math.max(1, current - 2);
+      let end = Math.min(total, current + 2);
+      
+      // Adjust if at beginning
+      if (current <= 3) {
+        end = Math.min(5, total);
+      }
+      // Adjust if at end
+      if (current >= total - 2) {
+        start = Math.max(1, total - 4);
+      }
+      
+      const pages = [];
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      return pages;
+    };
 
-      {/* Next */}
-      {nextEpExists ? (
-        <Link
-          to={`/soma/${story.slug}/${epNumber + 1}`}
-          className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-[#9B1B3B] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#C42B53]"
-        >
-          Mbele
-          <ArrowRightIcon className="h-3.5 w-3.5" />
-        </Link>
-      ) : <span className="w-[76px]" />}
-    </nav>
-  );
+    const visiblePages = getVisiblePages();
+    const totalPages = allEpisodes.length;
+
+    // Handle click on episode - show payment modal for locked episodes
+    const handleEpisodeClick = (pageNum: number) => {
+      if (isEpisodeLocked(pageNum)) {
+        // Show payment modal instead of navigating
+        setShowPaywall(true);
+        return;
+      }
+      navigate(`/soma/${story.slug}/${pageNum}`);
+    };
+
+    // If only one episode, show simple navigation
+    if (totalPages <= 1) {
+      return null;
+    }
+
+    return (
+      <nav
+        className={cn(
+          'flex flex-col gap-3 py-4',
+          position === 'top' ? 'mt-6 border-y' : 'mt-14 border-t pt-6',
+          light ? 'border-gray-100' : 'border-white/10'
+        )}
+        aria-label={`Urambazaji wa sehemu — ${position}`}
+      >
+        {/* Chapters Title */}
+        <div className="text-center">
+          <h3 className={cn(
+            'font-display text-sm font-bold uppercase tracking-wider',
+            light ? 'text-gray-900' : 'text-[#F6F0E8]'
+          )}>
+            Chapters
+          </h3>
+        </div>
+
+        {/* Page Numbers */}
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {/* First page with ellipsis */}
+          {visiblePages[0] > 1 && (
+            <>
+              <button
+                onClick={() => handleEpisodeClick(1)}
+                className={cn(
+                  'min-w-[36px] rounded-md border px-2 py-1.5 text-sm font-medium transition-colors',
+                  light
+                    ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    : 'border-white/20 bg-transparent text-white/80 hover:bg-white/10'
+                )}
+              >
+                1
+              </button>
+              {visiblePages[0] > 2 && (
+                <span className={cn('px-1 text-sm', light ? 'text-gray-400' : 'text-white/40')}>…</span>
+              )}
+            </>
+          )}
+
+          {/* Page numbers */}
+          {visiblePages.map((pageNum) => {
+            const isLocked = isEpisodeLocked(pageNum);
+            const isActive = pageNum === epNumber;
+            
+            return (
+              <button
+                key={pageNum}
+                onClick={() => handleEpisodeClick(pageNum)}
+                className={cn(
+                  'min-w-[36px] rounded-md border px-2 py-1.5 text-sm font-medium transition-colors relative cursor-pointer',
+                  isActive
+                    ? light
+                      ? 'border-[#9B1B3B] bg-[#9B1B3B] text-white hover:bg-[#C42B53]'
+                      : 'border-[#C9A24A] bg-[#C9A24A] text-[#0E0C0D] hover:bg-[#D4B05A]'
+                    : isLocked
+                      ? light
+                        ? 'border-gray-200 bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        : 'border-white/10 bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50'
+                      : light
+                        ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                        : 'border-white/20 bg-transparent text-white/80 hover:bg-white/10'
+                )}
+                title={isLocked ? "Bonyeza kununua hadithi" : `Sehemu ya ${pageNum}`}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
+
+          {/* Last page with ellipsis */}
+          {visiblePages[visiblePages.length - 1] < totalPages && (
+            <>
+              {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
+                <span className={cn('px-1 text-sm', light ? 'text-gray-400' : 'text-white/40')}>…</span>
+              )}
+              <button
+                onClick={() => handleEpisodeClick(totalPages)}
+                className={cn(
+                  'min-w-[36px] rounded-md border px-2 py-1.5 text-sm font-medium transition-colors',
+                  light
+                    ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    : 'border-white/20 bg-transparent text-white/80 hover:bg-white/10'
+                )}
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+        </div>
+      </nav>
+    );
+  };
 
   return (
     <div className={cn('min-h-screen w-full', light ? 'bg-white text-gray-900' : 'bg-[#0E0C0D] text-[#F6F0E8]')}>
@@ -279,6 +399,27 @@ export function Reader() {
             Sehemu ya {ep.episode_number} — {ep.title}
           </h2>
 
+          {/* Premium/Free indicator */}
+          <div className="mt-2 flex items-center gap-2">
+            {isFreeStory ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-green-600">
+                <UnlockIcon className="h-3 w-3" />
+                Bure
+              </span>
+            ) : isPaidStory && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#9B1B3B]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#9B1B3B]">
+                <LockIcon className="h-3 w-3" />
+                {isPurchased ? 'Imelipiwa' : 'Haijalipiwa'}
+              </span>
+            )}
+            {ep.is_free === true && !isFreeStory && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-green-600">
+                <UnlockIcon className="h-3 w-3" />
+                Sehemu Bure
+              </span>
+            )}
+          </div>
+
           {/* Meta */}
           <p className={cn('mt-3 flex items-center gap-2 text-xs', light ? 'text-gray-400' : 'text-gray-500')}>
             <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -326,8 +467,9 @@ export function Reader() {
               <SubscriptionExpiredModal
                 storyId={story.id}
                 storyTitle={story.title}
+                storyCover={story.cover_url} // ✅ Added cover image
                 price={story.price || 1000}
-                onClose={() => navigate(`/hadithi/${story.slug}`)}
+                onClose={() => setShowPaywall(false)}
                 onSuccess={() => setShowPaywall(false)}
               />
             </div>
@@ -354,10 +496,20 @@ export function Reader() {
         storyTitle={story.title}
         shareUrl={`https://kisa.co.tz/soma/${story.slug}/${ep.episode_number}`}
         episodeLabel={`Sehemu ya ${ep.episode_number}`}
-        prevDisabled={epNumber <= 1}
-        nextDisabled={!nextEpExists}
-        onPrev={() => navigate(`/soma/${story.slug}/${epNumber - 1}`)}
-        onNext={() => nextEpExists && navigate(`/soma/${story.slug}/${epNumber + 1}`)}
+        prevDisabled={epNumber <= 1 || isEpisodeLocked(epNumber - 1)}
+        nextDisabled={!nextEpExists || isEpisodeLocked(epNumber + 1)}
+        onPrev={() => {
+          const prevEp = epNumber - 1;
+          if (!isEpisodeLocked(prevEp)) {
+            navigate(`/soma/${story.slug}/${prevEp}`);
+          }
+        }}
+        onNext={() => {
+          const nextEp = epNumber + 1;
+          if (nextEpExists && !isEpisodeLocked(nextEp)) {
+            navigate(`/soma/${story.slug}/${nextEp}`);
+          }
+        }}
       />
     </div>
   );
