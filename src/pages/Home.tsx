@@ -84,14 +84,15 @@ export function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-10 space-y-10">
+    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-10 space-y-12">
       {/* Continue reading — only if logged in */}
       {user && <ContinueReading />}
 
       {/* Trending shelf */}
       {trending.length > 0 && (
         <Shelf
-          title="🔥 Zinazopendwa Tanzania"
+          title="🔥 Zinazosomwa Sana"
+          subtitle="Hadithi zinazovuma kwa sasa"
           stories={trending}
           viewAllHref="/zinazopendwa"
           viewAllLabel="Ona Zote"
@@ -103,6 +104,7 @@ export function Home() {
         <Shelf
           key={shelf.id}
           title={shelf.name}
+          subtitle={`Hadithi za ${shelf.name}`}
           stories={shelf.stories}
           viewAllHref={`/makundi/${shelf.slug}`}
           viewAllLabel="Ona Zote"
@@ -122,31 +124,40 @@ export function Home() {
 /* ── Story shelf row ──────────────────────────────────────────────────────── */
 function Shelf({
   title,
+  subtitle,
   stories,
   viewAllHref,
   viewAllLabel,
 }: {
   title: string;
+  subtitle?: string;
   stories: StoryCard[];
   viewAllHref: string;
   viewAllLabel: string;
 }) {
   return (
-    <section>
+    <section className="space-y-2">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="font-display text-xl font-bold text-gray-900 sm:text-2xl">{title}</h2>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+        <div>
+          <h2 className="font-display text-xl font-bold text-gray-900 sm:text-2xl">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-sm text-gray-400 mt-0.5">{subtitle}</p>
+          )}
+        </div>
         <Link
           to={viewAllHref}
-          className="flex items-center gap-1 text-sm font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors shrink-0"
+          className="flex items-center gap-1 text-sm font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors shrink-0 group"
         >
-          {viewAllLabel}
-          <ArrowRightIcon className="h-4 w-4" />
+          <span>{viewAllLabel}</span>
+          <ArrowRightIcon className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
 
-      {/* Horizontal scrolling card row */}
-      <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+      {/* Horizontal scrolling card row - removed fade indicators */}
+      <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 scroll-smooth">
         {stories.map((story) => (
           <StoryThumb key={story.id} story={story} />
         ))}
@@ -157,21 +168,19 @@ function Shelf({
 
 /* ── Story thumbnail card ─────────────────────────────────────────────────── */
 function StoryThumb({ story }: { story: StoryCard }) {
-  const isFree = !story.price || story.price === 0;
-
   return (
     <Link
       to={`/hadithi/${story.slug}`}
-      className="group flex w-[130px] shrink-0 flex-col sm:w-[150px]"
+      className="group flex w-[140px] shrink-0 flex-col sm:w-[160px]"
     >
       {/* Cover */}
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-100 shadow-sm group-hover:shadow-md transition-shadow">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-100 shadow-sm group-hover:shadow-md transition-shadow duration-300">
         {story.cover_url ? (
           <img
             src={story.cover_url}
             alt={`Jalada la ${story.title}`}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#9B1B3B]/10 to-[#C9A24A]/10">
@@ -189,11 +198,13 @@ function StoryThumb({ story }: { story: StoryCard }) {
       </div>
 
       {/* Text */}
-      <p className="mt-2 line-clamp-2 text-[13px] font-semibold leading-snug text-gray-900 group-hover:text-[#9B1B3B] transition-colors">
+      <p className="mt-2 line-clamp-2 text-[13px] font-semibold leading-snug text-gray-900 group-hover:text-[#9B1B3B] transition-colors duration-200">
         {story.title}
       </p>
       {story.authors?.name && (
-        <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">{story.authors.name}</p>
+        <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">
+          {story.authors.name}
+        </p>
       )}
     </Link>
   );
