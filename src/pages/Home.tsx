@@ -94,7 +94,7 @@ export function Home() {
           title="🔥 Zinazosomwa Sana"
           subtitle="Hadithi zinazovuma kwa sasa"
           stories={trending}
-          viewAllHref="/zinazopendwa"
+          viewAllHref="/hadithi"
           viewAllLabel="Ona Zote"
         />
       )}
@@ -106,7 +106,7 @@ export function Home() {
           title={shelf.name}
           subtitle={`Hadithi za ${shelf.name}`}
           stories={shelf.stories}
-          viewAllHref={`/makundi/${shelf.slug}`}
+          viewAllHref={`/hadithi?category=${encodeURIComponent(shelf.name)}`}
           viewAllLabel="Ona Zote"
         />
       ))}
@@ -156,7 +156,7 @@ function Shelf({
         </Link>
       </div>
 
-      {/* Horizontal scrolling card row - removed fade indicators */}
+      {/* Horizontal scrolling card row */}
       <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 scroll-smooth">
         {stories.map((story) => (
           <StoryThumb key={story.id} story={story} />
