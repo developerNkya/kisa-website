@@ -45,9 +45,9 @@ export function Login() {
       headline="Karibu KISA"
       subtitle="Ingia na uendelee na hadithi yako."
       footer={
-        <p>
+        <p className="text-gray-600">
           Huna akaunti?{' '}
-          <Link to="/jisajili" className="font-semibold text-gold hover:text-cream">
+          <Link to="/jisajili" className="font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
             Jisajili
           </Link>
         </p>
@@ -57,9 +57,9 @@ export function Login() {
         {error && (
           <div
             role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-wine/50 bg-wine/10 px-4 py-3 text-sm text-cream"
+            className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
-            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-wine-bright" aria-hidden="true" />
+            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
             {error}
           </div>
         )}
@@ -86,7 +86,12 @@ export function Login() {
           required
         />
 
-        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+        <Button 
+          type="submit" 
+          size="lg" 
+          className="w-full bg-[#9B1B3B] hover:bg-[#C42B53] text-white"
+          disabled={loading}
+        >
           {loading ? 'Inaingia...' : 'Ingia'}
         </Button>
       </form>
