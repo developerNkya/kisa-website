@@ -21,6 +21,8 @@ import { Profile } from './pages/Profile';
 import { Saved } from './pages/Saved';
 import { Landing } from './pages/Landing';
 import { NotFound } from './pages/NotFound';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminStories } from './pages/admin/AdminStories';
 import { AdminCreateStory } from './pages/admin/AdminCreateStory';
@@ -81,10 +83,16 @@ export function App() {
               <Route path="*" element={<NotFound />} />
             </Route>
 
-            <Route path="/soma/:slug/:episode" element={<Reader />} />
+            {/* Auth Routes */}
             <Route path="/ingia" element={<Login />} />
             <Route path="/jisajili" element={<Register />} />
+            <Route path="/sahau-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
+            {/* Reader Route - No Layout */}
+            <Route path="/soma/:slug/:episode" element={<Reader />} />
+
+            {/* Admin Routes */}
             <Route path="/admin" element={
               <AdminRoute><AdminLayout /></AdminRoute>
             }>
@@ -107,13 +115,13 @@ export function App() {
           </Routes>
 
           <Toaster
-            theme="dark"
+            theme="light"
             position="top-center"
             toastOptions={{
               style: {
-                background: '#20191B',
-                border: '1px solid #332A2D',
-                color: '#F6F0E8'
+                background: '#FFFFFF',
+                border: '1px solid #E5E7EB',
+                color: '#111827'
               }
             }}
           />

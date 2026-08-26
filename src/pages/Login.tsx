@@ -19,22 +19,51 @@ export function Login() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setError('Weka email yako ili kuendelea.');
-      return;
-    }
-    if (password.length < 4) {
-      setError('Namba ya siri haijakamilika. Jaribu tena.');
-      return;
-    }
+    
+    // Reset error
     setError('');
+    
+    // Validate email
+    if (!email.trim()) {
+      setError('Tafadhali weka barua pepe yako.');
+      return;
+    }
+    
+    // Validate password
+    if (password.length < 6) {
+      setError('Password lazima iwe na herufi 6 au zaidi.');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      
+      // Check if there was an error
+      if (result.error) {
+        // Map Supabase error messages to user-friendly messages
+        if (result.error.includes('Invalid login credentials')) {
+          setError('Barua pepe au password si sahihi. Tafadhali jaribu tena.');
+        } else if (result.error.includes('Email not confirmed')) {
+          setError('Barua pepe yako haijathibitishwa. Tafadhali angalia email yako.');
+        } else if (result.error.includes('User not found')) {
+          setError('Barua pepe hii haijasajiliwa. Tafadhali jisajili kwanza.');
+        } else if (result.error.includes('Invalid email')) {
+          setError('Barua pepe si sahihi. Tafadhali ingiza email sahihi.');
+        } else {
+          setError(result.error);
+        }
+        setLoading(false);
+        return;
+      }
+      
+      // Login successful
       navigate(redirect);
+      
     } catch (err: any) {
-      setError(err.message || 'Kuna tatizo limejitokeza. Jaribu tena.');
+      console.error('Login error:', err);
+      setError('Kuna tatizo limejitokeza. Jaribu tena.');
     } finally {
       setLoading(false);
     }
@@ -45,12 +74,19 @@ export function Login() {
       headline="Karibu KISA"
       subtitle="Ingia na uendelee na hadithi yako."
       footer={
-        <p className="text-gray-600">
-          Huna akaunti?{' '}
-          <Link to="/jisajili" className="font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
-            Jisajili
-          </Link>
-        </p>
+        <div className="space-y-2">
+          <p className="text-gray-600">
+            Huna akaunti?{' '}
+            <Link to="/jisajili" className="font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
+              Jisajili
+            </Link>
+          </p>
+          <p className="text-sm text-gray-500">
+            <Link to="/sahau-password" className="text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
+              Umesahau password?
+            </Link>
+          </p>
+        </div>
       }
     >
       <form onSubmit={submit} className="space-y-4" noValidate>
@@ -60,19 +96,20 @@ export function Login() {
             className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
             <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
-            {error}
+            <span>{error}</span>
           </div>
         )}
 
         <Field
           id="email"
-          label="Email"
+          label="Barua Pepe"
           type="email"
           value={email}
           onChange={setEmail}
           placeholder="jina@email.com"
           autoComplete="email"
           required
+          isLight={true}
         />
         
         <Field
@@ -84,6 +121,7 @@ export function Login() {
           placeholder="••••••••"
           autoComplete="current-password"
           required
+          isLight={true}
         />
 
         <Button 
@@ -92,7 +130,14 @@ export function Login() {
           className="w-full bg-[#9B1B3B] hover:bg-[#C42B53] text-white"
           disabled={loading}
         >
-          {loading ? 'Inaingia...' : 'Ingia'}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Inaingia...
+            </span>
+          ) : (
+            'Ingia'
+          )}
         </Button>
       </form>
     </AuthShell>

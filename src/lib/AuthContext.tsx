@@ -22,7 +22,7 @@ interface AuthState {
   isAdmin: boolean;
   loading: boolean;
   // Auth actions
-  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  login: (email: string, password: string) => Promise<{ error: string | null; data?: any }>;
   register: (
     fullName: string,
     email: string,
@@ -119,10 +119,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Login ────────────────────────────────────────────────────
   const login = useCallback(
-    async (email: string, password: string): Promise<{ error: string | null }> => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { error: error.message };
-      return { error: null };
+    async (email: string, password: string): Promise<{ error: string | null; data?: any }> => {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email, 
+          password 
+        });
+        
+        if (error) {
+          // ✅ Return the error message so it can be displayed
+          return { error: error.message };
+        }
+        
+        // ✅ Return success with user data
+        return { 
+          error: null, 
+          data: data 
+        };
+      } catch (err: any) {
+        // ✅ Catch any unexpected errors
+        console.error('Login error:', err);
+        return { error: err.message || 'Kuna tatizo limejitokeza. Jaribu tena.' };
+      }
     },
     []
   );
@@ -134,16 +152,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: string,
       password: string
     ): Promise<{ error: string | null }> => {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: fullName },
-          emailRedirectTo: undefined, // no email verification
-        },
-      });
-      if (error) return { error: error.message };
-      return { error: null };
+      try {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName },
+            emailRedirectTo: undefined, // no email verification
+          },
+        });
+        if (error) return { error: error.message };
+        return { error: null };
+      } catch (err: any) {
+        console.error('Register error:', err);
+        return { error: err.message || 'Kuna tatizo limejitokeza. Jaribu tena.' };
+      }
     },
     []
   );
