@@ -116,7 +116,7 @@ export function Saved() {
               to="/hadithi"
               className="text-sm font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors flex items-center gap-1"
             >
-              Gundua zaidi
+              zote
               <span className="text-lg">→</span>
             </Link>
           )}

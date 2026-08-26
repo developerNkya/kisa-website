@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { BellIcon, BookmarkIcon, SearchIcon, LogOut, Menu, X } from 'lucide-react';
+import { BellIcon, BookmarkIcon, SearchIcon, LogOut, Menu, X, UserIcon, HomeIcon, BookOpenIcon } from 'lucide-react';
 import { ButtonLink } from '../ui/Button';
 import { NotificationPanel } from '../NotificationPanel';
 import { useAuth } from '../../lib/AuthContext';
 import { cn } from '../../utils/cn';
 
 const links = [
-  { label: 'Hadithi', to: '/' },
+  { label: 'Mwanzo', to: '/', icon: HomeIcon },
+  { label: 'Hadithi', to: '/hadithi', icon: BookOpenIcon },
 ];
 
 export function Navbar() {
@@ -27,6 +28,7 @@ export function Navbar() {
   const handleLogout = async () => {
     await logout();
     navigate('/ingia');
+    setMobileOpen(false);
   };
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Mtumiaji';
@@ -86,30 +88,19 @@ export function Navbar() {
             <SearchIcon className="h-[18px] w-[18px]" />
           </button>
 
+          {/* Desktop: Favorites - visible on desktop only */}
           <Link
             to="/zilizohifadhiwa"
             aria-label="Zilizohifadhiwa"
-            className="hidden h-9 w-9 place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors sm:grid"
+            className="hidden lg:grid h-9 w-9 place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
             <BookmarkIcon className="h-[18px] w-[18px]" />
           </Link>
 
           {user ? (
             <>
-              <div className="relative">
-                <button
-                  onClick={() => setNotifOpen((v) => !v)}
-                  aria-label="Taarifa"
-                  aria-expanded={notifOpen}
-                  className="relative grid h-9 w-9 place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                >
-                  <BellIcon className="h-[18px] w-[18px]" />
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#C42B53] ring-2 ring-white" />
-                </button>
-                <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
-              </div>
-
-              <div className="ml-1 flex items-center gap-1.5">
+              {/* Desktop: User profile & logout */}
+              <div className="hidden lg:flex ml-1 items-center gap-1.5">
                 <Link
                   to="/akaunti"
                   className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 py-1 pl-1 pr-3 hover:border-gray-300 transition-colors"
@@ -128,6 +119,15 @@ export function Navbar() {
                   <LogOut className="h-[17px] w-[17px]" />
                 </button>
               </div>
+
+              {/* Mobile: hamburger menu */}
+              <button
+                onClick={() => setMobileOpen((v) => !v)}
+                className="ml-1 grid h-9 w-9 place-items-center rounded-full text-gray-500 hover:bg-gray-100 lg:hidden"
+                aria-label="Menyu"
+              >
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
             </>
           ) : (
             <div className="ml-1 flex items-center gap-2">
@@ -139,39 +139,76 @@ export function Navbar() {
               </ButtonLink>
             </div>
           )}
-
-          {/* Mobile menu toggle */}
-          <button
-            onClick={() => setMobileOpen((v) => !v)}
-            className="ml-1 grid h-9 w-9 place-items-center rounded-full text-gray-500 hover:bg-gray-100 lg:hidden"
-            aria-label="Menyu"
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
         </div>
       </div>
 
       {/* Mobile nav dropdown */}
       {mobileOpen && (
         <nav className="border-t border-gray-100 bg-white px-4 py-3 lg:hidden">
-          {links.map((l) => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              end={l.to === '/'}
+          <div className="flex flex-col gap-0.5">
+            {/* Main links */}
+            {links.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                end={l.to === '/'}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-[#9B1B3B]/10 text-[#9B1B3B]'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <l.icon className="h-5 w-5 shrink-0" />
+                    <span>{l.label}</span>
+                    {isActive && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#9B1B3B]" />
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+
+            {/* Divider */}
+            <div className="my-1 border-t border-gray-100" />
+
+            {/* Favorites - mobile */}
+            <Link
+              to="/zilizohifadhiwa"
               onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'block rounded-md px-3 py-2.5 text-sm font-medium',
-                  isActive
-                    ? 'bg-[#9B1B3B]/5 text-[#9B1B3B] font-semibold'
-                    : 'text-gray-700 hover:bg-gray-50'
-                )
-              }
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              {l.label}
-            </NavLink>
-          ))}
+              <BookmarkIcon className="h-5 w-5 shrink-0" />
+              <span>Zilizohifadhiwa</span>
+            </Link>
+
+            {/* Profile - mobile */}
+            <Link
+              to="/akaunti"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <UserIcon className="h-5 w-5 shrink-0" />
+              <span>Akaunti Yangu</span>
+            </Link>
+
+            {/* Divider */}
+            <div className="my-1 border-t border-gray-100" />
+
+            {/* Logout - mobile */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors w-full"
+            >
+              <LogOut className="h-5 w-5 shrink-0" />
+              <span>Toka</span>
+            </button>
+          </div>
         </nav>
       )}
     </header>
