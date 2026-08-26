@@ -14,9 +14,16 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    console.log('📝 Payment request received:', { 
+      userId: req.body.userId?.substring(0, 8),
+      storyId: req.body.storyId?.substring(0, 8),
+      paymentMethod: req.body.paymentMethod 
+    });
+
     const { userId, storyId, paymentMethod = 'mobile', customer, mobileNetwork } = req.body;
 
     if (!userId || !customer) {
+      console.error('❌ Missing required fields:', { userId: !!userId, customer: !!customer });
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
@@ -25,6 +32,7 @@ module.exports = async function handler(req, res) {
 
     // If purchasing a specific story, fetch the story price and title
     if (storyId) {
+      console.log('🔍 Fetching story:', storyId);
       const { data: story, error: storyError } = await supabaseAdmin
         .from('stories')
         .select('id, title, price')
@@ -32,17 +40,30 @@ module.exports = async function handler(req, res) {
         .single();
 
       if (storyError || !story) {
+        console.error('❌ Story not found:', storyError);
         return res.status(404).json({ success: false, error: 'Story not found' });
       }
 
       amount = story.price || 1000;
       storyTitle = story.title;
+      console.log('✅ Story found:', { title: storyTitle, amount });
     }
 
     const reference = storyId 
       ? `KSP-${storyId.slice(0, 4)}-${userId.slice(0, 4)}-${Date.now()}`
       : `KSB-${userId.slice(0, 8)}-${Date.now()}`;
 
+    console.log('📝 Creating transaction with reference:', reference);
+
+    // ✅ Split full name into first and last name properly
+    const fullName = (customer.fullName || customer.firstname || 'Msomaji').trim();
+    const nameParts = fullName.split(' ');
+    const firstname = nameParts[0] || 'Msomaji';
+    const lastname = nameParts.slice(1).join(' ') || 'KISA'; // Always provide a lastname
+
+    const customerName = `${firstname} ${lastname}`.trim();
+
+    // Insert transaction
     const { data: transaction, error: txError } = await supabaseAdmin
       .from('subscription_transactions')
       .insert({
@@ -52,7 +73,7 @@ module.exports = async function handler(req, res) {
         payment_method: paymentMethod,
         status: 'pending',
         reference,
-        customer_name: `${customer.firstname || customer.fullName || ''} ${customer.lastname || ''}`.trim() || 'Msomaji wa KISA',
+        customer_name: customerName,
         customer_phone: customer.phone_number || customer.phone,
         customer_email: customer.email,
       })
@@ -60,20 +81,25 @@ module.exports = async function handler(req, res) {
       .single();
 
     if (txError) {
-      console.error('Payment transaction insert error:', txError);
-      return res.status(500).json({ success: false, error: 'Failed to create transaction' });
+      console.error('❌ Transaction insert error:', txError);
+      return res.status(500).json({ success: false, error: 'Failed to create transaction', details: txError.message });
     }
 
+    console.log('✅ Transaction created:', transaction.id);
+
+    // Format phone number
     let rawPhone = customer.phone_number || customer.phone || '';
     let phoneNumber = String(rawPhone).replace(/^\+/, '').replace(/\D/g, '');
     if (phoneNumber.startsWith('0')) phoneNumber = '255' + phoneNumber.substring(1);
+    console.log('📱 Formatted phone:', phoneNumber);
 
     let paymentUrl = null;
     const snippeKey = process.env.SNIPPE_API_KEY;
 
+    console.log('🔑 Snippe Key present:', !!snippeKey);
+
     if (snippeKey) {
-      let webhookUrl =
-        process.env.SNIPPE_WEBHOOK_URL || 'https://kisa.co.tz/api/webhooks/snippe';
+      let webhookUrl = process.env.SNIPPE_WEBHOOK_URL || 'https://kisa.co.tz/api/webhooks/snippe';
       if (webhookUrl.includes('localhost')) {
         webhookUrl = 'https://kisa.co.tz/api/webhooks/snippe';
       }
@@ -89,8 +115,8 @@ module.exports = async function handler(req, res) {
           description: `Malipo ya hadithi: ${storyTitle}`
         },
         customer: {
-          firstname: (customer.firstname || customer.fullName || 'Msomaji').trim(),
-          lastname: (customer.lastname || '').trim(),
+          firstname: firstname,  // ✅ Always has a value
+          lastname: lastname,    // ✅ Always has a value
           email: (customer.email || 'reader@kisa.co.tz').trim(),
         },
         metadata: {
@@ -105,24 +131,47 @@ module.exports = async function handler(req, res) {
         },
       };
 
-      const baseUrl = process.env.SNIPPE_API_BASE_URL || 'https://api.snippe.sh';
-      const snippeResponse = await axios.post(`${baseUrl}/api/v1/payments`, snippePayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${snippeKey}`,
-          'Idempotency-Key': `pay-${reference}`,
-        },
-        timeout: 30000,
+      console.log('📤 Sending to Snippe:', { 
+        amount, 
+        phone: phoneNumber,
+        customer: snippePayload.customer,
+        webhook: webhookUrl 
       });
 
-      paymentUrl = snippeResponse.data?.data?.checkout_url || null;
-      
-      const snippeReference = snippeResponse.data?.data?.reference || null;
-      if (snippeReference) {
-        await supabaseAdmin
-          .from('subscription_transactions')
-          .update({ snippe_reference: snippeReference })
-          .eq('id', transaction.id);
+      try {
+        const baseUrl = process.env.SNIPPE_API_BASE_URL || 'https://api.snippe.sh';
+        const snippeResponse = await axios.post(`${baseUrl}/api/v1/payments`, snippePayload, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${snippeKey}`,
+            'Idempotency-Key': `pay-${reference}`,
+          },
+          timeout: 30000,
+        });
+
+        console.log('✅ Snippe response received:', snippeResponse.status);
+        paymentUrl = snippeResponse.data?.data?.checkout_url || null;
+        
+        const snippeReference = snippeResponse.data?.data?.reference || null;
+        if (snippeReference) {
+          await supabaseAdmin
+            .from('subscription_transactions')
+            .update({ snippe_reference: snippeReference })
+            .eq('id', transaction.id);
+        }
+      } catch (snippeError) {
+        console.error('❌ Snippe API error:', {
+          message: snippeError.message,
+          response: snippeError.response?.data,
+          status: snippeError.response?.status
+        });
+        
+        // ✅ Return Snippe error to frontend
+        return res.status(400).json({
+          success: false,
+          error: snippeError.response?.data?.message || 'Payment provider error',
+          details: snippeError.response?.data || null
+        });
       }
     }
 
@@ -133,6 +182,7 @@ module.exports = async function handler(req, res) {
         .eq('id', transaction.id);
     }
 
+    console.log('✅ Payment initiated successfully');
     return res.json({
       success: true,
       reference,
@@ -140,16 +190,21 @@ module.exports = async function handler(req, res) {
       payment_url: paymentUrl,
       amount,
       story_title: storyTitle,
-      message:
-        paymentMethod === 'mobile'
-          ? `Ombi la malipo ya TZS ${amount.toLocaleString()} limetumwa kwenye simu yako`
-          : 'Elekezwa kwenye ukurasa wa malipo',
+      message: paymentMethod === 'mobile'
+        ? `Ombi la malipo ya TZS ${amount.toLocaleString()} limetumwa kwenye simu yako`
+        : 'Elekezwa kwenye ukurasa wa malipo',
     });
   } catch (error) {
-    console.error('Story pay error:', error);
+    console.error('❌ Payment error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status
+    });
     return res.status(500).json({
       success: false,
       error: error.response?.data?.message || error.message || 'Payment initiation failed',
+      details: error.response?.data || null
     });
   }
 };

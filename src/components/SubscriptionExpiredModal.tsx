@@ -103,13 +103,25 @@ export function SubscriptionExpiredModal({
       });
 
       const data = await res.json();
+      
+      // ✅ Handle error response from backend
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Ombi la malipo halikufanikiwa');
+        // Show specific error message from backend
+        const errorMsg = data.error || data.details?.message || 'Ombi la malipo halikufanikiwa';
+        toast.error(errorMsg);
+        throw new Error(errorMsg);
       }
 
+      // ✅ Payment initiated successfully
+      toast.success(data.message || 'Ombi la malipo limetumwa');
       setShowPaymentModal(true);
+      
     } catch (err: any) {
-      toast.error(err.message || 'Hitilafu wakati wa kuanzisha malipo');
+      console.error('Payment error:', err);
+      // Error already shown via toast, but this is a fallback
+      if (!err.message?.includes('Ombi la malipo')) {
+        toast.error(err.message || 'Hitilafu wakati wa kuanzisha malipo');
+      }
     } finally {
       setLoading(false);
     }

@@ -199,7 +199,7 @@ export function Login() {
         {/* ✅ Show payment intent info if present (for debugging) */}
         {storyId && price && (
           <div className="text-xs text-gray-400 text-center bg-gray-50 p-2 rounded">
-            💳 Unaelekezwa kwenye malipo ya "{storyTitle}" baada ya kuingia
+            💳 Utarudishwa kufanya malipo ya "{storyTitle}" baada ya kuingia
           </div>
         )}
       </form>
