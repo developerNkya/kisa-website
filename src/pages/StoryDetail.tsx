@@ -41,13 +41,9 @@ export function StoryDetail() {
     const autoPay = searchParams.get('autoPay') === 'true';
     
     if (autoPay && pendingPayment && story) {
-      // ✅ Check if the pending payment is for this story
       if (pendingPayment.storyId === story.id) {
-        // ✅ Auto-open payment modal
         setShowPaywallModal(true);
-        // ✅ Clear the pending payment after showing modal
         clearPendingPayment();
-        // ✅ Remove the autoPay param from URL without refreshing
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
         toast.info('Karibu tena! Malipo yako yanasubiri.');
@@ -81,7 +77,6 @@ export function StoryDetail() {
           if (epData) setEpisodes(epData);
 
           if (user) {
-            // ✅ Fetch reading progress with episode details
             const { data: progData } = await supabase
               .from("reading_progress")
               .select(
@@ -95,7 +90,6 @@ export function StoryDetail() {
               .maybeSingle();
 
             if (progData) {
-              // ✅ Ensure episode_number is available
               const progressWithEpisode = {
                 ...progData,
                 episode_number:
@@ -107,7 +101,6 @@ export function StoryDetail() {
             }
           }
 
-          // Related stories based on category (only used for StoryRail - keeping for now but not used)
           if (storyData.category_id) {
             const { data: relData } = await supabase
               .from("stories")
@@ -118,7 +111,6 @@ export function StoryDetail() {
             if (relData) setRelated(relData);
           }
 
-          // Load similar stories (new horizontal scroll section)
           const { data: similarData } = await supabase
             .from("stories")
             .select(
@@ -153,49 +145,35 @@ export function StoryDetail() {
     }
   }, [story]);
 
-  // 🔍 Smart access check - checks episode is_free, story price, and purchase status
+  // 🔍 Smart access check
   const canAccessEpisode = (episodeNumber: number) => {
-    // Find the episode
     const episode = episodes.find((e) => e.episode_number === episodeNumber);
 
-    // 1️⃣ PRIMARY RULE: Check episode's is_free field (Database source of truth)
     if (episode?.is_free === true) return true;
-
-    // 2️⃣ If story is free (price = 0), all episodes are free
     const isPaidStory = (story?.price ?? 1000) > 0;
     if (!isPaidStory) return true;
-
-    // 3️⃣ If user purchased, all episodes are accessible
     if (hasPurchasedStory(story?.id)) return true;
-
-    // 4️⃣ Everything else is locked
     return false;
   };
 
-  // Get the next unlocked episode for the "Continue Reading" button
+  // Get the next unlocked episode
   const getNextUnlockedEpisode = () => {
     if (!episodes.length) return 1;
-
-    // Find first unlocked episode
     for (let i = 0; i < episodes.length; i++) {
       if (canAccessEpisode(episodes[i].episode_number)) {
         return episodes[i].episode_number;
       }
     }
-    return 1; // Fallback
+    return 1;
   };
 
-  // Get the episode to start reading from (continue progress or first unlocked)
+  // Get the episode to start reading from
   const getStartEpisode = () => {
-    // If user has progress, try to continue from there
     if (progress) {
-      // ✅ Get the episode number from progress (with fallback)
       const currentEpisode = progress.episode_number || 1;
       const nextEp = currentEpisode + 1;
 
-      // If next episode is locked, find the last unlocked episode
       if (!canAccessEpisode(nextEp)) {
-        // Find the highest unlocked episode they've read
         for (let i = episodes.length - 1; i >= 0; i--) {
           const ep = episodes[i];
           if (
@@ -209,7 +187,6 @@ export function StoryDetail() {
       return nextEp <= episodes.length ? nextEp : currentEpisode;
     }
 
-    // No progress, start from first unlocked episode
     return getNextUnlockedEpisode();
   };
 
@@ -219,7 +196,6 @@ export function StoryDetail() {
   const isPaidStory = storyPrice > 0;
   const isFreeStory = storyPrice === 0;
 
-  // Check if there are any free episodes
   const hasFreeEpisodes = episodes.some((e) =>
     canAccessEpisode(e.episode_number),
   );
@@ -228,26 +204,23 @@ export function StoryDetail() {
   const minutes = totalMinutes(episodes.map((e) => e.reading_minutes || 5));
   const tags = story?.tags || [];
 
-  // Handle episode click from EpisodeList
+  // Handle episode click
   const handleEpisodeClick = (episodeNumber: number) => {
     if (canAccessEpisode(episodeNumber)) {
-      // Navigate to reader
       window.location.href = `/soma/${story.slug}/${episodeNumber}`;
     } else {
-      // ✅ Track locked episode click
       track.lockedEpisodeClick({
         id: story.id,
         title: story.title,
         episodeNumber: episodeNumber,
       });
 
-      // Show payment modal
       setSelectedEpisode(episodeNumber);
       setShowPaywallModal(true);
     }
   };
 
-  // Enhanced story object with premium info
+  // Enhanced story object
   const storyObj = {
     ...story,
     episodes: episodes.map((e) => ({
@@ -328,22 +301,29 @@ export function StoryDetail() {
               </span>
             </p>
 
-            {/* Premium/Free badge with price integrated */}
-            {isFreeStory ? (
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-600">
-                <UnlockIcon className="h-3 w-3" />
-                Bure
-              </div>
-            ) : (
-              isPaidStory && (
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#9B1B3B]/10 px-3 py-1 text-xs font-semibold text-[#9B1B3B]">
-                  <LockIcon className="h-3 w-3" />
-                  {isPurchased
-                    ? "Imelipiwa"
-                    : `Haijalipiwa · TSh ${storyPrice.toLocaleString()}`}
-                </div>
-              )
-            )}
+{/* Premium/Free badge with price integrated */}
+{isFreeStory ? (
+  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-600">
+    <UnlockIcon className="h-3 w-3" />
+    Bure
+  </div>
+) : (
+  isPaidStory && (
+    <div className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold">
+      {isPurchased ? (
+        <span className="bg-green-500/20 text-green-700 rounded-full px-2 py-0.5 inline-flex items-center gap-1.5">
+          <UnlockIcon className="h-3 w-3" />
+          Imelipiwa
+        </span>
+      ) : (
+        <span className="bg-[#9B1B3B]/10 text-[#9B1B3B] rounded-full px-2 py-0.5 inline-flex items-center gap-1.5">
+          <LockIcon className="h-3 w-3" />
+          Haijalipiwa · TSh {storyPrice.toLocaleString()}
+        </span>
+      )}
+    </div>
+  )
+)}
 
             {story.hook && (
               <p className="mt-4 font-display text-base italic text-gray-600 max-w-xl">
@@ -437,7 +417,7 @@ export function StoryDetail() {
             </div>
           </div>
 
-          {/* Similar Stories Section - Moved to bottom */}
+          {/* Similar Stories Section */}
           {similarStories.length > 0 && (
             <section className="pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between gap-4 mb-4">
@@ -453,7 +433,6 @@ export function StoryDetail() {
                 </Link>
               </div>
 
-              {/* Horizontal Scroll */}
               <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 scroll-smooth">
                 {similarStories.map((story) => (
                   <SimilarStoryCard key={story.id} story={story} />
@@ -463,13 +442,6 @@ export function StoryDetail() {
           )}
         </div>
       </div>
-
-      {/* REMOVED: Duplicate StoryRail section */}
-      {/* {related.length > 0 && (
-        <div className="mt-16 border-t border-gray-100 pt-10">
-          <StoryRail title="Hadithi zinazofanana" stories={related.map(s => ({...s, cover: s.cover_url}))} href="/hadithi" />
-        </div>
-      )} */}
 
       {/* Paywall Modal */}
       {showPaywallModal && (

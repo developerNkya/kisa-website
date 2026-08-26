@@ -108,11 +108,8 @@ export function Reader() {
   // ✅ Check for pending payment and auto-open modal
   useEffect(() => {
     if (pendingPayment && story && showPaywall) {
-      // Check if the pending payment is for this story
       if (pendingPayment.storyId === story.id) {
-        // Auto-open the payment modal if it's not already shown
         setShowPaywall(true);
-        // Clear the pending payment after showing modal
         clearPendingPayment();
         toast.info('Karibu tena! Malipo yako yanasubiri.');
       }
@@ -207,20 +204,12 @@ export function Reader() {
 
   // 🔍 Smart check if episode is locked
   const isEpisodeLocked = (episodeNum: number) => {
-    // Find the episode
     const episode = allEpisodes.find((e) => e.episode_number === episodeNum);
 
-    // 1️⃣ PRIMARY RULE: Check episode's is_free field (Database source of truth)
     if (episode?.is_free === true) return false;
-
-    // 2️⃣ If story is free (price = 0), all episodes are free
     const isPaidStory = (story?.price ?? 1000) > 0;
     if (!isPaidStory) return false;
-
-    // 3️⃣ If user purchased, all episodes are accessible
     if (hasPurchasedStory(story?.id)) return false;
-
-    // 4️⃣ Everything else is locked
     return true;
   };
 
@@ -252,36 +241,25 @@ export function Reader() {
 
   /* ── Chapter navigation component (reused at top & bottom) ──────────────── */
   const ChapterNav = ({ position }: { position: "top" | "bottom" }) => {
-    // Check if a specific episode is locked (premium)
     const isEpisodeLocked = (episodeNum: number) => {
-      // Find the episode
       const episode = allEpisodes.find((e) => e.episode_number === episodeNum);
 
-      // 1️⃣ PRIMARY RULE: Check episode's is_free field
       if (episode?.is_free === true) return false;
-
-      // 2️⃣ If story is free, all episodes are free
       const isPaidStory = (story?.price ?? 1000) > 0;
       if (!isPaidStory) return false;
-
-      // 3️⃣ User has purchased the story
       if (hasPurchasedStory(story?.id)) return false;
-
-      return true; // Locked
+      return true;
     };
 
-    // Get visible page numbers (show current, 2 before, 2 after)
     const getVisiblePages = () => {
       const total = allEpisodes.length;
       const current = epNumber;
       let start = Math.max(1, current - 2);
       let end = Math.min(total, current + 2);
 
-      // Adjust if at beginning
       if (current <= 3) {
         end = Math.min(5, total);
       }
-      // Adjust if at end
       if (current >= total - 2) {
         start = Math.max(1, total - 4);
       }
@@ -296,23 +274,19 @@ export function Reader() {
     const visiblePages = getVisiblePages();
     const totalPages = allEpisodes.length;
 
-    // Handle click on episode - show payment modal for locked episodes
     const handleEpisodeClick = (pageNum: number) => {
       if (isEpisodeLocked(pageNum)) {
-        // ✅ Track locked episode click
         track.lockedEpisodeClick({
           id: story.id,
           title: story.title,
           episodeNumber: pageNum,
         });
-        // Show payment modal instead of navigating
         setShowPaywall(true);
         return;
       }
       navigate(`/soma/${story.slug}/${pageNum}`);
     };
 
-    // If only one episode, show simple navigation
     if (totalPages <= 1) {
       return null;
     }
@@ -326,7 +300,6 @@ export function Reader() {
         )}
         aria-label={`Urambazaji wa sehemu — ${position}`}
       >
-        {/* Chapters Title */}
         <div className="text-center">
           <h3
             className={cn(
@@ -338,9 +311,7 @@ export function Reader() {
           </h3>
         </div>
 
-        {/* Page Numbers */}
         <div className="flex flex-wrap items-center justify-center gap-1.5">
-          {/* First page with ellipsis */}
           {visiblePages[0] > 1 && (
             <>
               <button
@@ -367,7 +338,6 @@ export function Reader() {
             </>
           )}
 
-          {/* Page numbers */}
           {visiblePages.map((pageNum) => {
             const isLocked = isEpisodeLocked(pageNum);
             const isActive = pageNum === epNumber;
@@ -399,7 +369,6 @@ export function Reader() {
             );
           })}
 
-          {/* Last page with ellipsis */}
           {visiblePages[visiblePages.length - 1] < totalPages && (
             <>
               {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
@@ -457,7 +426,6 @@ export function Reader() {
           </Link>
         </div>
 
-        {/* Horizontal Scroll */}
         <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 scroll-smooth">
           {similarStories.map((story) => (
             <SimilarStoryCard key={story.id} story={story} light={light} />
@@ -483,7 +451,6 @@ export function Reader() {
         to={`/hadithi/${story.slug}`}
         className="group flex w-[130px] shrink-0 flex-col sm:w-[150px]"
       >
-        {/* Cover */}
         <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl border border-gray-100 bg-gray-100 shadow-sm group-hover:shadow-md transition-shadow duration-300">
           {story.cover_url ? (
             <img
@@ -500,14 +467,12 @@ export function Reader() {
             </div>
           )}
 
-          {/* Views Badge */}
           <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
             <Eye className="w-3 h-3 text-gray-300" />
             {compact(story.total_reads || 0)}
           </span>
         </div>
 
-        {/* Text */}
         <p
           className={cn(
             "mt-2 line-clamp-2 text-[13px] font-semibold leading-snug group-hover:text-[#9B1B3B] transition-colors duration-200",
@@ -581,7 +546,6 @@ export function Reader() {
             {Math.round(scrollPercent)}%
           </span>
         </div>
-        {/* Progress bar */}
         <div
           className={cn(
             "h-[3px] w-full",
@@ -602,7 +566,6 @@ export function Reader() {
             readerPrefs.width === "narrow" ? "max-w-read" : "max-w-[46rem]",
           )}
         >
-          {/* Tags */}
           <p
             className={cn(
               "text-[11px] font-bold uppercase tracking-[0.2em]",
@@ -612,12 +575,10 @@ export function Reader() {
             {(story.tags || []).join(" · ")}
           </p>
 
-          {/* Story title */}
           <h1 className="mt-3 font-display text-[28px] font-black uppercase leading-[1.08] tracking-wide sm:text-[36px]">
             {story.title}
           </h1>
 
-          {/* Episode subtitle */}
           <h2
             className={cn(
               "mt-2 font-display text-lg font-semibold",
@@ -627,7 +588,7 @@ export function Reader() {
             Sehemu ya {ep.episode_number} — {ep.title}
           </h2>
 
-          {/* Premium/Free indicator */}
+          {/* Premium/Free indicator - removed "Sehemu Bure" */}
           <div className="mt-2 flex items-center gap-2">
             {isFreeStory ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-green-600">
@@ -636,21 +597,23 @@ export function Reader() {
               </span>
             ) : (
               isPaidStory && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#9B1B3B]/10 px-2.5 py-0.5 text-[10px] font-semibold text-[#9B1B3B]">
-                  <LockIcon className="h-3 w-3" />
-                  {isPurchased ? "Imelipiwa" : "Haijalipiwa"}
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold">
+                  {isPurchased ? (
+                    <span className="bg-green-500/20 text-green-700 rounded-full px-2 py-0.5 inline-flex items-center gap-1">
+                      <UnlockIcon className="h-3 w-3" />
+                      Imelipiwa
+                    </span>
+                  ) : (
+                    <span className="bg-[#9B1B3B]/10 text-[#9B1B3B] rounded-full px-2 py-0.5 inline-flex items-center gap-1">
+                      <LockIcon className="h-3 w-3" />
+                      Haijalipiwa
+                    </span>
+                  )}
                 </span>
               )
             )}
-            {ep.is_free === true && !isFreeStory && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-green-600">
-                <UnlockIcon className="h-3 w-3" />
-                Sehemu Bure
-              </span>
-            )}
           </div>
 
-          {/* Meta */}
           <p
             className={cn(
               "mt-3 flex items-center gap-2 text-xs",
@@ -662,10 +625,8 @@ export function Reader() {
             {story.authors?.name || story.author}
           </p>
 
-          {/* ── TOP Chapter Navigation ── */}
           <ChapterNav position="top" />
 
-          {/* Divider */}
           <div
             className={cn(
               "mt-8 mb-8 h-px w-16",
@@ -674,14 +635,12 @@ export function Reader() {
             aria-hidden="true"
           />
 
-          {/* YouTube embed if episode has video */}
           {ep.youtube_video_id && (
             <div className="mb-10">
               <YouTubeEmbed videoId={ep.youtube_video_id} />
             </div>
           )}
 
-          {/* Story body text */}
           <div
             className="mt-10 font-read reader-body"
             style={{ fontSize: `${readerPrefs.fontSize}px`, lineHeight: 1.9 }}
@@ -701,7 +660,6 @@ export function Reader() {
             ))}
           </div>
 
-          {/* Paywall or bottom navigation */}
           {showPaywall ? (
             <div className="mt-10">
               <SubscriptionExpiredModal
@@ -715,13 +673,8 @@ export function Reader() {
             </div>
           ) : (
             <>
-              {/* ── BOTTOM Chapter Navigation ── */}
               <ChapterNav position="bottom" />
-
-              {/* ── Similar Stories ── */}
               <SimilarStories />
-
-              {/* ── Comments & Rating ── */}
               <div
                 className={cn(
                   "mt-16 border-t pt-8",

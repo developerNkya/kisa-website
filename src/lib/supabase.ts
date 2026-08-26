@@ -1,16 +1,14 @@
+// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-// ✅ Remove fallback values - use only environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// ✅ TEMPORARY - Hardcode for Vercel deployment
+// Once working, switch back to environment variables
+const supabaseUrl = 'https://ucyyxukvxkouvwlvzhnb.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjeXl4dWt2eGtvdXZ3bHZ6aG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2OTIyMjksImV4cCI6MjEwMjI2ODIyOX0.1H9tW-xA9G4vtTIXEWjtFyVAUtsxHjion5pff8OvvLw';
 
-// ✅ Throw error if variables are missing
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase environment variables');
-  console.error('VITE_SUPABASE_URL:', supabaseUrl);
-  console.error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ exists' : '❌ missing');
-  throw new Error('Missing Supabase environment variables. Please check your .env file.');
-}
+// ✅ Keep this for debugging
+console.log('🔍 Supabase URL:', supabaseUrl);
+console.log('🔍 Supabase ANON Key:', supabaseAnonKey ? '✅ Set' : '❌ Missing');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
