@@ -8,3 +8,11 @@ npx supabase db push
 a. admin:
 email:super@demo.com
 password: qwedsaqwedsa
+
+
+
+steps to deploy:
+vercel --prod --force 
+--> ensure project made public.
+
+run: npm run dev
