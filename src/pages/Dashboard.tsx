@@ -289,7 +289,7 @@ export function Dashboard() {
               </ButtonLink>
             </section>
 
-            <section aria-labelledby="dash-notif" className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            {/* <section aria-labelledby="dash-notif" className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <BellIcon className="h-4 w-4 text-[#9B1B3B]" aria-hidden="true" />
                 <h2 id="dash-notif" className="font-display text-base font-bold text-gray-900">
@@ -307,15 +307,15 @@ export function Dashboard() {
                   </li>
                 ))}
               </ul>
-            </section>
+            </section> */}
 
-            <Link
+            {/* <Link
               to="/wasifu"
               className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm transition-colors duration-150 hover:border-gray-300"
             >
               <span className="text-sm font-semibold text-gray-900">Mipangilio ya wasifu</span>
               <ArrowRightIcon className="h-4 w-4 text-gray-400" />
-            </Link>
+            </Link> */}
           </aside>
         </div>
       </div>
