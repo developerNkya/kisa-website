@@ -11,12 +11,21 @@ import { supabase } from './supabase';
 import type { Profile, Subscription } from '../types/database';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface PendingPayment {
+  storyId: string;
+  storyTitle: string;
+  price: number;
+  returnUrl: string;
+  timestamp?: number;
+}
+
 interface AuthState {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
   subscription: Subscription | null;
   purchasedStoryIds: string[];
+  pendingPayment: PendingPayment | null;
   hasPurchasedStory: (storyId: string) => boolean;
   isPremium: boolean;
   isAdmin: boolean;
@@ -33,6 +42,9 @@ interface AuthState {
   refreshProfile: () => Promise<void>;
   refreshSubscription: () => Promise<void>;
   refreshPurchases: () => Promise<void>;
+  // Payment intent
+  setPendingPayment: (payment: PendingPayment | null) => void;
+  clearPendingPayment: () => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -45,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [purchasedStoryIds, setPurchasedStoryIds] = useState<string[]>([]);
+  const [pendingPayment, setPendingPaymentState] = useState<PendingPayment | null>(null);
   const [loading, setLoading] = useState(true);
 
   // ── Fetch profile from DB ────────────────────────────────────
@@ -84,6 +97,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSubscription(data ?? null);
   }, []);
 
+  // ── Check pending payment from sessionStorage ────────────────
+  const checkPendingPayment = useCallback(() => {
+    try {
+      const stored = sessionStorage.getItem('pending_payment');
+      if (stored) {
+        const payment = JSON.parse(stored);
+        setPendingPaymentState(payment);
+        return payment;
+      }
+    } catch (err) {
+      console.error('Error checking pending payment:', err);
+    }
+    return null;
+  }, []);
+
   // ── Bootstrap session on mount ───────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
@@ -94,8 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchProfile(s.user.id),
           fetchPurchases(s.user.id),
           fetchSubscription(s.user.id)
-        ]).finally(() => setLoading(false));
+        ]).finally(() => {
+          // ✅ Check for pending payment after loading
+          checkPendingPayment();
+          setLoading(false);
+        });
       } else {
+        checkPendingPayment();
         setLoading(false);
       }
     });
@@ -112,10 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPurchasedStoryIds([]);
         setSubscription(null);
       }
+      // ✅ Check for pending payment on auth change
+      checkPendingPayment();
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [fetchProfile, fetchPurchases, fetchSubscription]);
+  }, [fetchProfile, fetchPurchases, fetchSubscription, checkPendingPayment]);
 
   // ── Login ────────────────────────────────────────────────────
   const login = useCallback(
@@ -127,17 +162,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         
         if (error) {
-          // ✅ Return the error message so it can be displayed
           return { error: error.message };
         }
         
-        // ✅ Return success with user data
         return { 
           error: null, 
           data: data 
         };
       } catch (err: any) {
-        // ✅ Catch any unexpected errors
         console.error('Login error:', err);
         return { error: err.message || 'Kuna tatizo limejitokeza. Jaribu tena.' };
       }
@@ -158,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: {
             data: { full_name: fullName },
-            emailRedirectTo: undefined, // no email verification
+            emailRedirectTo: undefined,
           },
         });
         if (error) return { error: error.message };
@@ -173,6 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Logout ───────────────────────────────────────────────────
   const logout = useCallback(async () => {
+    // ✅ Clear pending payment on logout
+    sessionStorage.removeItem('pending_payment');
+    setPendingPaymentState(null);
     await supabase.auth.signOut();
   }, []);
 
@@ -188,6 +223,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshSubscription = useCallback(async () => {
     if (user) await fetchSubscription(user.id);
   }, [user, fetchSubscription]);
+
+  // ── Payment intent setters ──────────────────────────────────
+  const setPendingPayment = useCallback((payment: PendingPayment | null) => {
+    setPendingPaymentState(payment);
+    if (payment) {
+      try {
+        sessionStorage.setItem('pending_payment', JSON.stringify(payment));
+      } catch (err) {
+        console.error('Error saving pending payment:', err);
+      }
+    } else {
+      try {
+        sessionStorage.removeItem('pending_payment');
+      } catch (err) {
+        console.error('Error removing pending payment:', err);
+      }
+    }
+  }, []);
+
+  const clearPendingPayment = useCallback(() => {
+    setPendingPaymentState(null);
+    try {
+      sessionStorage.removeItem('pending_payment');
+    } catch (err) {
+      console.error('Error removing pending payment:', err);
+    }
+  }, []);
 
   // ── Check if story purchased ─────────────────────────────────
   const hasPurchasedStory = useCallback((storyId: string): boolean => {
@@ -213,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       subscription,
       purchasedStoryIds,
+      pendingPayment,
       hasPurchasedStory,
       isPremium,
       isAdmin,
@@ -223,11 +286,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshProfile,
       refreshSubscription,
       refreshPurchases,
+      setPendingPayment,
+      clearPendingPayment,
     }),
     [
-      session, user, profile, subscription, purchasedStoryIds, hasPurchasedStory,
-      isPremium, isAdmin, loading, login, register, logout, refreshProfile,
-      refreshSubscription, refreshPurchases,
+      session, user, profile, subscription, purchasedStoryIds, pendingPayment,
+      hasPurchasedStory, isPremium, isAdmin, loading, login, register, logout,
+      refreshProfile, refreshSubscription, refreshPurchases,
+      setPendingPayment, clearPendingPayment,
     ]
   );
 

@@ -8,6 +8,7 @@ import {
   UnlockIcon,
   Eye,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useKisa } from "../contexts/KisaContext";
 import { useAuth } from "../lib/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -26,7 +27,7 @@ export function Reader() {
   const { slug, episode } = useParams();
   const navigate = useNavigate();
   const { readerPrefs, setReaderPrefs } = useKisa();
-  const { user, hasPurchasedStory } = useAuth();
+  const { user, hasPurchasedStory, pendingPayment, clearPendingPayment } = useAuth();
 
   const [story, setStory] = useState<any>(null);
   const [ep, setEp] = useState<any>(null);
@@ -103,6 +104,20 @@ export function Reader() {
     }
     loadData();
   }, [slug, epNumber, hasPurchasedStory]);
+
+  // ✅ Check for pending payment and auto-open modal
+  useEffect(() => {
+    if (pendingPayment && story && showPaywall) {
+      // Check if the pending payment is for this story
+      if (pendingPayment.storyId === story.id) {
+        // Auto-open the payment modal if it's not already shown
+        setShowPaywall(true);
+        // Clear the pending payment after showing modal
+        clearPendingPayment();
+        toast.info('Karibu tena! Malipo yako yanasubiri.');
+      }
+    }
+  }, [pendingPayment, story, showPaywall, clearPendingPayment]);
 
   // ✅ Track when user starts reading an episode (Meta Pixel)
   useEffect(() => {

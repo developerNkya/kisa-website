@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircleIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import { AuthShell } from '../components/auth/AuthShell';
 import { Field } from '../components/ui/Field';
 import { Button } from '../components/ui/Button';
@@ -15,7 +16,24 @@ export function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ✅ Get all params from URL
   const redirect = searchParams.get('redirect') || '/';
+  const storyId = searchParams.get('story_id');
+  const storyTitle = searchParams.get('story_title');
+  const price = searchParams.get('price');
+
+  // ✅ Check if there's a pending payment
+  useEffect(() => {
+    const pendingPayment = sessionStorage.getItem('pending_payment');
+    if (pendingPayment) {
+      try {
+        const payment = JSON.parse(pendingPayment);
+        console.log('💾 Found pending payment:', payment);
+      } catch (err) {
+        console.error('Error parsing pending payment:', err);
+      }
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +76,45 @@ export function Login() {
         return;
       }
       
-      // Login successful
+      // ✅ Login successful - check for pending payment
+      const pendingPayment = sessionStorage.getItem('pending_payment');
+      
+      if (pendingPayment) {
+        try {
+          const payment = JSON.parse(pendingPayment);
+          
+          // ✅ If there's a pending payment, redirect back to the story
+          // The StoryDetail component will detect the pending payment and auto-open the modal
+          toast.success('Karibu tena! Tunakuelekeza kwenye hadithi yako.');
+          
+          // Clear the pending payment after use
+          sessionStorage.removeItem('pending_payment');
+          
+          // Redirect to the story page with a flag to auto-open payment modal
+          navigate(`${payment.returnUrl || `/hadithi/${storyId}`}?autoPay=true`);
+          return;
+        } catch (err) {
+          console.error('Error processing pending payment:', err);
+        }
+      }
+      
+      // ✅ Check if payment params are in the URL
+      if (storyId && price) {
+        // Save to session storage for the story detail to pick up
+        const paymentIntent = {
+          storyId,
+          storyTitle: storyTitle || 'Hadithi Hii',
+          price: Number(price),
+          returnUrl: redirect
+        };
+        sessionStorage.setItem('pending_payment', JSON.stringify(paymentIntent));
+        
+        toast.success('Karibu tena! Tunakuelekeza kwenye malipo.');
+        navigate(`${redirect}?autoPay=true`);
+        return;
+      }
+      
+      // ✅ Normal login - redirect to the original destination
       navigate(redirect);
       
     } catch (err: any) {
@@ -139,6 +195,13 @@ export function Login() {
             'Ingia'
           )}
         </Button>
+
+        {/* ✅ Show payment intent info if present (for debugging) */}
+        {storyId && price && (
+          <div className="text-xs text-gray-400 text-center bg-gray-50 p-2 rounded">
+            💳 Unaelekezwa kwenye malipo ya "{storyTitle}" baada ya kuingia
+          </div>
+        )}
       </form>
     </AuthShell>
   );

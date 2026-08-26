@@ -3,7 +3,7 @@ import { BookOpen, Lock, X, Check, Smartphone, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
 import { SubscriptionPaymentModal } from './SubscriptionPaymentModal';
-import { track } from '../lib/pixel'; // ✅ Add this import
+import { track } from '../lib/pixel';
 
 interface SubscriptionExpiredModalProps {
   storyId?: string;
@@ -31,17 +31,46 @@ export function SubscriptionExpiredModal({
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if it's a subscription (no storyId)
     if (onSubscribe && !storyId) {
       onSubscribe();
       return;
     }
 
+    // ✅ Check if user is logged in - if not, redirect to login with payment intent
     if (!user) {
+      // Store payment intent in session storage
+      const paymentIntent = {
+        storyId: storyId || '',
+        storyTitle: storyTitle || '',
+        price: price || 1000,
+        returnUrl: window.location.pathname,
+        timestamp: Date.now()
+      };
+      
+      try {
+        sessionStorage.setItem('pending_payment', JSON.stringify(paymentIntent));
+        console.log('💾 Payment intent saved:', paymentIntent);
+      } catch (err) {
+        console.error('Error saving payment intent:', err);
+      }
+      
       toast.error('Tafadhali ingia kwanza ili kununua hadithi hii');
-      window.location.href = `/ingia?redirect=${encodeURIComponent(window.location.pathname)}`;
+      
+      // ✅ Redirect to login with return URL and payment params
+      const params = new URLSearchParams({
+        redirect: window.location.pathname,
+        story_id: storyId || '',
+        story_title: storyTitle || '',
+        price: String(price || 1000)
+      });
+      
+      window.location.href = `/ingia?${params.toString()}`;
       return;
     }
 
+    // ✅ Validate phone number
     if (!phone.trim()) {
       toast.error('Weka namba ya simu');
       return;
@@ -98,6 +127,9 @@ export function SubscriptionExpiredModal({
         price: price,
       });
     }
+    
+    // ✅ Clear any pending payment
+    sessionStorage.removeItem('pending_payment');
     
     if (onSuccess) onSuccess();
     else window.location.reload();

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   BookOpenIcon,
   ClockIcon,
@@ -8,6 +8,7 @@ import {
   UnlockIcon,
   Eye,
 } from "lucide-react";
+import { toast } from "sonner";
 import { EpisodeList } from "../components/EpisodeList";
 import { StoryRail } from "../components/StoryRail";
 import { ButtonLink } from "../components/ui/Button";
@@ -23,7 +24,8 @@ import { useTrackView } from "../hooks/useTrackView";
 
 export function StoryDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const { user, hasPurchasedStory } = useAuth();
+  const { user, hasPurchasedStory, pendingPayment, clearPendingPayment } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [story, setStory] = useState<any>(null);
   const [episodes, setEpisodes] = useState<any[]>([]);
@@ -33,6 +35,25 @@ export function StoryDetail() {
   const [loading, setLoading] = useState(true);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<number | null>(null);
+
+  // ✅ Check for auto-pay flag and pending payment
+  useEffect(() => {
+    const autoPay = searchParams.get('autoPay') === 'true';
+    
+    if (autoPay && pendingPayment && story) {
+      // ✅ Check if the pending payment is for this story
+      if (pendingPayment.storyId === story.id) {
+        // ✅ Auto-open payment modal
+        setShowPaywallModal(true);
+        // ✅ Clear the pending payment after showing modal
+        clearPendingPayment();
+        // ✅ Remove the autoPay param from URL without refreshing
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+        toast.info('Karibu tena! Malipo yako yanasubiri.');
+      }
+    }
+  }, [pendingPayment, story, searchParams, clearPendingPayment]);
 
   // ✅ Track story view using the new hook
   const viewCount = useTrackView(story?.id, "view");
