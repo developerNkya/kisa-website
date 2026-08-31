@@ -27,6 +27,7 @@ export interface Story {
   hook: string;
   description: string;
   cover: string;
+  cover_url?: string;     // DB column alias
   author: string;
   genres: Genre[];
   status: StoryStatus;
@@ -35,6 +36,7 @@ export interface Story {
   isNew: boolean;
   rating: number;
   reads: number;
+  total_reads?: number;   // DB column alias
   price?: number;
   releasedAt: string;
   tags: string[];

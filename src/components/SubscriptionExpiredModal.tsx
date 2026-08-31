@@ -87,7 +87,7 @@ export function SubscriptionExpiredModal({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/story/pay', {
+      const res = await fetch('/api/subscription/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
