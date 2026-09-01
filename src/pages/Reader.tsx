@@ -27,7 +27,8 @@ export function Reader() {
   const { slug, episode } = useParams();
   const navigate = useNavigate();
   const { readerPrefs, setReaderPrefs } = useKisa();
-  const { user, hasPurchasedStory, pendingPayment, clearPendingPayment } = useAuth();
+  const { user, hasPurchasedStory, pendingPayment, clearPendingPayment } =
+    useAuth();
 
   const [story, setStory] = useState<any>(null);
   const [ep, setEp] = useState<any>(null);
@@ -111,7 +112,7 @@ export function Reader() {
       if (pendingPayment.storyId === story.id) {
         setShowPaywall(true);
         clearPendingPayment();
-        toast.info('Karibu tena! Malipo yako yanasubiri.');
+        toast.info("Karibu tena! Malipo yako yanasubiri.");
       }
     }
   }, [pendingPayment, story, showPaywall, clearPendingPayment]);
@@ -251,21 +252,11 @@ export function Reader() {
       return true;
     };
 
+    // ✅ FIXED: Show ALL chapters - no ellipsis
     const getVisiblePages = () => {
       const total = allEpisodes.length;
-      const current = epNumber;
-      let start = Math.max(1, current - 2);
-      let end = Math.min(total, current + 2);
-
-      if (current <= 3) {
-        end = Math.min(5, total);
-      }
-      if (current >= total - 2) {
-        start = Math.max(1, total - 4);
-      }
-
       const pages = [];
-      for (let i = start; i <= end; i++) {
+      for (let i = 1; i <= total; i++) {
         pages.push(i);
       }
       return pages;
@@ -312,32 +303,6 @@ export function Reader() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-1.5">
-          {visiblePages[0] > 1 && (
-            <>
-              <button
-                onClick={() => handleEpisodeClick(1)}
-                className={cn(
-                  "min-w-[36px] rounded-md border px-2 py-1.5 text-sm font-medium transition-colors",
-                  light
-                    ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    : "border-white/20 bg-transparent text-white/80 hover:bg-white/10",
-                )}
-              >
-                1
-              </button>
-              {visiblePages[0] > 2 && (
-                <span
-                  className={cn(
-                    "px-1 text-sm",
-                    light ? "text-gray-400" : "text-white/40",
-                  )}
-                >
-                  …
-                </span>
-              )}
-            </>
-          )}
-
           {visiblePages.map((pageNum) => {
             const isLocked = isEpisodeLocked(pageNum);
             const isActive = pageNum === epNumber;
@@ -368,32 +333,6 @@ export function Reader() {
               </button>
             );
           })}
-
-          {visiblePages[visiblePages.length - 1] < totalPages && (
-            <>
-              {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
-                <span
-                  className={cn(
-                    "px-1 text-sm",
-                    light ? "text-gray-400" : "text-white/40",
-                  )}
-                >
-                  …
-                </span>
-              )}
-              <button
-                onClick={() => handleEpisodeClick(totalPages)}
-                className={cn(
-                  "min-w-[36px] rounded-md border px-2 py-1.5 text-sm font-medium transition-colors",
-                  light
-                    ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    : "border-white/20 bg-transparent text-white/80 hover:bg-white/10",
-                )}
-              >
-                {totalPages}
-              </button>
-            </>
-          )}
         </div>
       </nav>
     );
