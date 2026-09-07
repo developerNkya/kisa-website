@@ -42,12 +42,25 @@ export function AdminEpisodes() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this episode?')) return;
     try {
-      const { error } = await supabase.from('episodes').delete().eq('id', id);
+      const { data: deleted, error } = await supabase
+        .from('episodes')
+        .delete()
+        .eq('id', id)
+        .select('id');          // returning the deleted row confirms it was removed
+      
       if (error) throw error;
+      
+      if (!deleted || deleted.length === 0) {
+        // RLS silently blocked the delete — row still exists
+        toast.error('Delete failed: you may not have permission, or the session expired. Try logging out and back in.');
+        return;
+      }
+      
       toast.success('Episode deleted');
       setEpisodes(episodes.filter(e => e.id !== id));
-    } catch (err) {
-      toast.error('Failed to delete episode');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error(err?.message || 'Failed to delete episode');
     }
   };
 

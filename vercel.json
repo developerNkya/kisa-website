@@ -3,11 +3,24 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/story/pay",
+      "destination": "/api/subscription/pay"
+    },
+    {
+      "source": "/api/subscription/pay",
+      "destination": "/api/subscription/pay"
+    },
+    {
+      "source": "/api/webhooks/snippe",
+      "destination": "/api/webhooks/snippe"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
   "env": {
+    "SNIPPE_API_KEY": "snp_43938ef3829c7c842d18ed7d6178db15cee4a3ba19a2f1339cb2c619df80f1e5",
     "SUPABASE_URL": "https://ucyyxukvxkouvwlvzhnb.supabase.co",
     "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjeXl4dWt2eGtvdXZ3bHZ6aG5iIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjY5MjIyOSwiZXhwIjoyMTAyMjY4MjI5fQ.wmLco-oYKA5ZYTsklOknihpb6par7e09xddiD2kRqFM",
     "VITE_SUPABASE_URL": "https://ucyyxukvxkouvwlvzhnb.supabase.co",
