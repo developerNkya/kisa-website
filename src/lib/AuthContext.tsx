@@ -133,7 +133,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event: string, s: Session | null) => {
+      // Session expired or token refresh failed — sign out and redirect to homepage
+      if (event === 'TOKEN_REFRESH_FAILED' || (event === 'SIGNED_OUT' && !s)) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setPurchasedStoryIds([]);
+        setSubscription(null);
+        sessionStorage.removeItem('pending_payment');
+        setPendingPaymentState(null);
+
+        if (event === 'TOKEN_REFRESH_FAILED') {
+          supabase.auth.signOut().then(() => {
+            window.location.href = '/';
+          });
+        }
+        return;
+      }
+
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
