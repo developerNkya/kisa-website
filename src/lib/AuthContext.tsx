@@ -9,6 +9,8 @@ import React, {
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { Profile, Subscription } from '../types/database';
+import { identifyUser, resetAnalytics } from './analytics';
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PendingPayment {
@@ -183,6 +185,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: error.message };
         }
         
+        // Identify user in PostHog so sessions are linked to a real person
+        if (data?.user) {
+          identifyUser(data.user.id, { email: data.user.email });
+        }
+        
         return { 
           error: null, 
           data: data 
@@ -223,9 +230,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Logout ───────────────────────────────────────────────────
   const logout = useCallback(async () => {
-    // ✅ Clear pending payment on logout
     sessionStorage.removeItem('pending_payment');
     setPendingPaymentState(null);
+    resetAnalytics(); // clear PostHog identity
     await supabase.auth.signOut();
   }, []);
 

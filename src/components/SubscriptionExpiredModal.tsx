@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BookOpen, Lock, X, Check, Smartphone, Loader2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { toast } from 'sonner';
 import { SubscriptionPaymentModal } from './SubscriptionPaymentModal';
 import { track } from '../lib/pixel';
+import { analytics } from '../lib/analytics';
+
 
 interface SubscriptionExpiredModalProps {
   storyId?: string;
@@ -29,6 +31,23 @@ export function SubscriptionExpiredModal({
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  useEffect(() => {
+    if (storyId) {
+      analytics.paywallHit({
+        story_id: storyId,
+        story_title: storyTitle,
+        episode_number: 4,
+        price,
+        user_logged_in: !!user,
+      });
+      analytics.paymentModalOpened({
+        story_id: storyId,
+        story_title: storyTitle,
+        price,
+      });
+    }
+  }, [storyId, storyTitle, price, user]);
+
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -40,6 +59,13 @@ export function SubscriptionExpiredModal({
 
     // ✅ Check if user is logged in - if not, redirect to login with payment intent
     if (!user) {
+      if (storyId) {
+        analytics.paymentRequiredLogin({
+          story_id: storyId,
+          story_title: storyTitle,
+          price,
+        });
+      }
       // Store payment intent in session storage
       const paymentIntent = {
         storyId: storyId || '',
@@ -83,6 +109,12 @@ export function SubscriptionExpiredModal({
         title: storyTitle,
         price: price,
       });
+      analytics.paymentAttempted({
+        story_id: storyId,
+        story_title: storyTitle,
+        price,
+        phone_prefix: phone.trim().slice(0, 4),
+      });
     }
 
     setLoading(true);
@@ -108,6 +140,14 @@ export function SubscriptionExpiredModal({
       if (!res.ok || !data.success) {
         // Show specific error message from backend
         const errorMsg = data.error || data.details?.message || 'Ombi la malipo halikufanikiwa';
+        if (storyId) {
+          analytics.paymentFailed({
+            story_id: storyId,
+            story_title: storyTitle,
+            price,
+            error: errorMsg,
+          });
+        }
         toast.error(errorMsg);
         throw new Error(errorMsg);
       }
@@ -118,7 +158,14 @@ export function SubscriptionExpiredModal({
       
     } catch (err: any) {
       console.error('Payment error:', err);
-      // Error already shown via toast, but this is a fallback
+      if (storyId && !err.message?.includes('Ombi la malipo')) {
+        analytics.paymentFailed({
+          story_id: storyId,
+          story_title: storyTitle,
+          price,
+          error: err.message || 'Unknown network error',
+        });
+      }
       if (!err.message?.includes('Ombi la malipo')) {
         toast.error(err.message || 'Hitilafu wakati wa kuanzisha malipo');
       }
@@ -137,6 +184,11 @@ export function SubscriptionExpiredModal({
         id: storyId,
         title: storyTitle,
         price: price,
+      });
+      analytics.paymentSuccess({
+        story_id: storyId,
+        story_title: storyTitle,
+        price,
       });
     }
     

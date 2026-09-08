@@ -6,6 +6,8 @@ import { AuthShell } from '../components/auth/AuthShell';
 import { Field } from '../components/ui/Field';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../lib/AuthContext';
+import { analytics } from '../lib/analytics';
+
 
 export function Login() {
   const { login } = useAuth();
@@ -54,6 +56,7 @@ export function Login() {
     }
 
     setLoading(true);
+    analytics.loginAttempt();
     
     try {
       const result = await login(email, password);
@@ -61,20 +64,28 @@ export function Login() {
       // Check if there was an error
       if (result.error) {
         // Map Supabase error messages to user-friendly messages
+        let friendlyMsg = result.error;
         if (result.error.includes('Invalid login credentials')) {
-          setError('Barua pepe au password si sahihi. Tafadhali jaribu tena.');
+          friendlyMsg = 'Barua pepe au password si sahihi. Tafadhali jaribu tena.';
+          setError(friendlyMsg);
         } else if (result.error.includes('Email not confirmed')) {
-          setError('Barua pepe yako haijathibitishwa. Tafadhali angalia email yako.');
+          friendlyMsg = 'Barua pepe yako haijathibitishwa. Tafadhali angalia email yako.';
+          setError(friendlyMsg);
         } else if (result.error.includes('User not found')) {
-          setError('Barua pepe hii haijasajiliwa. Tafadhali jisajili kwanza.');
+          friendlyMsg = 'Barua pepe hii haijasajiliwa. Tafadhali jisajili kwanza.';
+          setError(friendlyMsg);
         } else if (result.error.includes('Invalid email')) {
-          setError('Barua pepe si sahihi. Tafadhali ingiza email sahihi.');
+          friendlyMsg = 'Barua pepe si sahihi. Tafadhali ingiza email sahihi.';
+          setError(friendlyMsg);
         } else {
           setError(result.error);
         }
+        analytics.loginFailed(friendlyMsg);
         setLoading(false);
         return;
       }
+      
+      analytics.loginSuccess();
       
       // ✅ Login successful - check for pending payment
       const pendingPayment = sessionStorage.getItem('pending_payment');

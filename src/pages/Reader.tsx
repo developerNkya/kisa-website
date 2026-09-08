@@ -22,6 +22,8 @@ import { cn } from "../utils/cn";
 import { track } from "../lib/pixel";
 import { compact } from "../utils/format";
 import { useTrackView } from "../hooks/useTrackView";
+import { analytics } from "../lib/analytics";
+
 
 export function Reader() {
   const { slug, episode } = useParams();
@@ -97,6 +99,14 @@ export function Reader() {
         // Check if user can access this episode
         const isUnlocked = isEpisodeFree || !isPaidStory || isPurchased;
         setShowPaywall(!isUnlocked);
+
+        // Track episode start
+        analytics.episodeStarted({
+          story_id: storyData.id,
+          story_title: storyData.title,
+          episode_number: epNumber,
+          is_free: isUnlocked,
+        });
       } catch (err: any) {
         setError(err.message);
       } finally {
