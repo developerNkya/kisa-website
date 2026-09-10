@@ -37,7 +37,8 @@ interface AuthState {
   register: (
     fullName: string,
     email: string,
-    password: string
+    password: string,
+    phoneArg?: string
   ) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   // Data refresh
@@ -47,6 +48,24 @@ interface AuthState {
   // Payment intent
   setPendingPayment: (payment: PendingPayment | null) => void;
   clearPendingPayment: () => void;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+export function normalizePhone(phone: string): string {
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    cleaned = '255' + cleaned.substring(1);
+  }
+  return cleaned;
+}
+
+export function phoneOrEmailToAuthEmail(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.includes('@')) {
+    return trimmed.toLowerCase();
+  }
+  const norm = normalizePhone(trimmed);
+  return `${norm}@kisa.co.tz`;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -99,19 +118,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSubscription(data ?? null);
   }, []);
 
-  // ── Check pending payment from sessionStorage ────────────────
+  // ── Check pending payment ────────────────────────────────────
   const checkPendingPayment = useCallback(() => {
     try {
       const stored = sessionStorage.getItem('pending_payment');
       if (stored) {
-        const payment = JSON.parse(stored);
-        setPendingPaymentState(payment);
-        return payment;
+        const parsed = JSON.parse(stored);
+        setPendingPaymentState(parsed);
       }
-    } catch (err) {
-      console.error('Error checking pending payment:', err);
+    } catch (e) {
+      console.error('Error checking pending payment:', e);
     }
-    return null;
+  }, []);
+
+  const clearPendingPayment = useCallback(() => {
+    sessionStorage.removeItem('pending_payment');
+    setPendingPaymentState(null);
   }, []);
 
   // ── Bootstrap session on mount ───────────────────────────────
@@ -125,7 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchPurchases(s.user.id),
           fetchSubscription(s.user.id)
         ]).finally(() => {
-          // ✅ Check for pending payment after loading
           checkPendingPayment();
           setLoading(false);
         });
@@ -135,25 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event: string, s: Session | null) => {
-      // Session expired or token refresh failed — sign out and redirect to homepage
-      if (event === 'TOKEN_REFRESH_FAILED' || (event === 'SIGNED_OUT' && !s)) {
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-        setPurchasedStoryIds([]);
-        setSubscription(null);
-        sessionStorage.removeItem('pending_payment');
-        setPendingPaymentState(null);
-
-        if (event === 'TOKEN_REFRESH_FAILED') {
-          supabase.auth.signOut().then(() => {
-            window.location.href = '/';
-          });
-        }
-        return;
-      }
-
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
@@ -165,19 +168,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPurchasedStoryIds([]);
         setSubscription(null);
       }
-      // ✅ Check for pending payment on auth change
       checkPendingPayment();
     });
 
     return () => listener.subscription.unsubscribe();
   }, [fetchProfile, fetchPurchases, fetchSubscription, checkPendingPayment]);
 
-  // ── Login ────────────────────────────────────────────────────
+  // ── Login (supports Phone number or Email) ───────────────────
   const login = useCallback(
-    async (email: string, password: string): Promise<{ error: string | null; data?: any }> => {
+    async (identifier: string, password: string): Promise<{ error: string | null; data?: any }> => {
       try {
+        const authEmail = phoneOrEmailToAuthEmail(identifier);
         const { data, error } = await supabase.auth.signInWithPassword({ 
-          email, 
+          email: authEmail, 
           password 
         });
         
@@ -185,9 +188,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: error.message };
         }
         
-        // Identify user in PostHog so sessions are linked to a real person
         if (data?.user) {
-          identifyUser(data.user.id, { email: data.user.email });
+          identifyUser(data.user.id, { email: data.user.email, phone: identifier });
         }
         
         return { 
@@ -202,23 +204,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  // ── Register ─────────────────────────────────────────────────
+  // ── Register (supports Phone number or Email) ─────────────────
   const register = useCallback(
     async (
       fullName: string,
-      email: string,
-      password: string
+      identifier: string,
+      password: string,
+      phoneArg?: string
     ): Promise<{ error: string | null }> => {
       try {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const rawPhone = phoneArg || identifier;
+        const phone = normalizePhone(rawPhone);
+        const authEmail = phoneOrEmailToAuthEmail(identifier);
+
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail,
           password,
           options: {
-            data: { full_name: fullName },
+            data: { full_name: fullName, phone: phone },
             emailRedirectTo: undefined,
           },
         });
+
         if (error) return { error: error.message };
+
+        if (data?.user) {
+          await supabase
+            .from('profiles')
+            .update({ phone: phone, full_name: fullName })
+            .eq('id', data.user.id);
+        }
+
         return { error: null };
       } catch (err: any) {
         console.error('Register error:', err);
@@ -264,15 +280,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error('Error removing pending payment:', err);
       }
-    }
-  }, []);
-
-  const clearPendingPayment = useCallback(() => {
-    setPendingPaymentState(null);
-    try {
-      sessionStorage.removeItem('pending_payment');
-    } catch (err) {
-      console.error('Error removing pending payment:', err);
     }
   }, []);
 

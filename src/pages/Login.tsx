@@ -8,12 +8,11 @@ import { Button } from '../components/ui/Button';
 import { useAuth } from '../lib/AuthContext';
 import { analytics } from '../lib/analytics';
 
-
 export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,9 +42,9 @@ export function Login() {
     // Reset error
     setError('');
     
-    // Validate email
-    if (!email.trim()) {
-      setError('Tafadhali weka barua pepe yako.');
+    // Validate phone / identifier
+    if (!phone.trim()) {
+      setError('Tafadhali weka namba yako ya simu.');
       return;
     }
     
@@ -59,23 +58,16 @@ export function Login() {
     analytics.loginAttempt();
     
     try {
-      const result = await login(email, password);
+      const result = await login(phone, password);
       
       // Check if there was an error
       if (result.error) {
-        // Map Supabase error messages to user-friendly messages
         let friendlyMsg = result.error;
         if (result.error.includes('Invalid login credentials')) {
-          friendlyMsg = 'Barua pepe au password si sahihi. Tafadhali jaribu tena.';
-          setError(friendlyMsg);
-        } else if (result.error.includes('Email not confirmed')) {
-          friendlyMsg = 'Barua pepe yako haijathibitishwa. Tafadhali angalia email yako.';
+          friendlyMsg = 'Namba ya simu au password si sahihi. Tafadhali jaribu tena.';
           setError(friendlyMsg);
         } else if (result.error.includes('User not found')) {
-          friendlyMsg = 'Barua pepe hii haijasajiliwa. Tafadhali jisajili kwanza.';
-          setError(friendlyMsg);
-        } else if (result.error.includes('Invalid email')) {
-          friendlyMsg = 'Barua pepe si sahihi. Tafadhali ingiza email sahihi.';
+          friendlyMsg = 'Namba hii ya simu haijasajiliwa. Tafadhali jisajili kwanza.';
           setError(friendlyMsg);
         } else {
           setError(result.error);
@@ -93,15 +85,8 @@ export function Login() {
       if (pendingPayment) {
         try {
           const payment = JSON.parse(pendingPayment);
-          
-          // ✅ If there's a pending payment, redirect back to the story
-          // The StoryDetail component will detect the pending payment and auto-open the modal
           toast.success('Karibu tena! Tunakuelekeza kwenye hadithi yako.');
-          
-          // Clear the pending payment after use
           sessionStorage.removeItem('pending_payment');
-          
-          // Redirect to the story page with a flag to auto-open payment modal
           navigate(`${payment.returnUrl || `/hadithi/${storyId}`}?autoPay=true`);
           return;
         } catch (err) {
@@ -111,7 +96,6 @@ export function Login() {
       
       // ✅ Check if payment params are in the URL
       if (storyId && price) {
-        // Save to session storage for the story detail to pick up
         const paymentIntent = {
           storyId,
           storyTitle: storyTitle || 'Hadithi Hii',
@@ -125,7 +109,7 @@ export function Login() {
         return;
       }
       
-      // ✅ Normal login - redirect to the original destination
+      // ✅ Normal login - redirect to homepage (which shows user's stories)
       navigate(redirect);
       
     } catch (err: any) {
@@ -139,18 +123,13 @@ export function Login() {
   return (
     <AuthShell
       headline="Karibu KISA"
-      subtitle="Ingia na uendelee na hadithi yako."
+      subtitle="Ingia na namba yako ya simu na password."
       footer={
         <div className="space-y-2">
           <p className="text-gray-600">
             Huna akaunti?{' '}
             <Link to="/jisajili" className="font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
               Jisajili
-            </Link>
-          </p>
-          <p className="text-sm text-gray-500">
-            <Link to="/sahau-password" className="text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
-              Umesahau password?
             </Link>
           </p>
         </div>
@@ -168,13 +147,13 @@ export function Login() {
         )}
 
         <Field
-          id="email"
-          label="Barua Pepe"
-          type="email"
-          value={email}
-          onChange={setEmail}
-          placeholder="jina@email.com"
-          autoComplete="email"
+          id="phone"
+          label="Namba ya Simu"
+          type="tel"
+          value={phone}
+          onChange={setPhone}
+          placeholder="0712345678"
+          autoComplete="tel"
           required
           isLight={true}
         />
@@ -207,7 +186,6 @@ export function Login() {
           )}
         </Button>
 
-        {/* ✅ Show payment intent info if present (for debugging) */}
         {storyId && price && (
           <div className="text-xs text-gray-400 text-center bg-gray-50 p-2 rounded">
             💳 Utarudishwa kufanya malipo ya "{storyTitle}" baada ya kuingia

@@ -5,12 +5,13 @@ import { Field } from '../components/ui/Field';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../lib/AuthContext';
 import { AlertCircleIcon } from 'lucide-react';
+import { analytics } from '../lib/analytics';
 
 export function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [repeatPassword, setRepeatPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -21,21 +22,30 @@ export function Register() {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = 'Tuambie jina lako.';
-    if (!email.trim()) next.email = 'Weka email yako.';
+    if (!phone.trim()) next.phone = 'Weka namba yako ya simu (mfano 0712345678).';
     if (password.length < 6) next.password = 'Namba ya siri iwe na herufi 6 au zaidi.';
-    if (password !== repeatPassword) next.repeatPassword = 'Namba za siri hazifanani.';
+    if (password !== repeatPassword) next.repeatPassword = 'Password hazifanani.';
     
     setErrors(next);
     setGlobalError('');
     if (Object.keys(next).length > 0) return;
     
     setLoading(true);
+    analytics.registerAttempt();
     
     try {
-      await register(name, email, password);
-      navigate('/');
+      const res = await register(name, phone, password, phone);
+      if (res.error) {
+        setGlobalError(res.error);
+        analytics.registerFailed(res.error);
+      } else {
+        analytics.registerSuccess();
+        navigate('/');
+      }
     } catch (err: any) {
-      setGlobalError(err.message || 'Usajili umeshindikana. Tafadhali jaribu tena.');
+      const msg = err.message || 'Usajili umeshindikana. Tafadhali jaribu tena.';
+      setGlobalError(msg);
+      analytics.registerFailed(msg);
     } finally {
       setLoading(false);
     }
@@ -43,13 +53,13 @@ export function Register() {
 
   return (
     <AuthShell
-      headline="Anza safari yako ya hadithi."
-      subtitle="Akaunti moja, hadithi zote za KISA."
+      headline="Jisajili KISA"
+      subtitle="Akaunti moja ya simu, hadithi zote ulizonunua."
       footer={
-        <p>
-          Una akaunti?{' '}
-          <Link to="/ingia" className="font-semibold text-gold hover:text-cream">
-            Ingia
+        <p className="text-gray-600">
+          Una akaunti tayari?{' '}
+          <Link to="/ingia" className="font-semibold text-[#9B1B3B] hover:text-[#C42B53] transition-colors">
+            Ingia hapa
           </Link>
         </p>
       }
@@ -58,16 +68,36 @@ export function Register() {
         {globalError && (
           <div
             role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-wine/50 bg-wine/10 px-4 py-3 text-sm text-cream"
+            className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
-            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-wine-bright" aria-hidden="true" />
+            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
             {globalError}
           </div>
         )}
       
-        <Field id="name" label="Jina Kamili" value={name} onChange={setName} placeholder="Amina Hassan" required error={errors.name} />
+        <Field 
+          id="name" 
+          label="Jina Kamili" 
+          value={name} 
+          onChange={setName} 
+          placeholder="Amina Hassan" 
+          required 
+          error={errors.name} 
+          isLight={true}
+        />
         
-        <Field id="email" label="Email" type="email" value={email} onChange={setEmail} placeholder="jina@email.com" autoComplete="email" required error={errors.email} />
+        <Field 
+          id="phone" 
+          label="Namba ya Simu" 
+          type="tel" 
+          value={phone} 
+          onChange={setPhone} 
+          placeholder="0712345678" 
+          autoComplete="tel" 
+          required 
+          error={errors.phone}
+          isLight={true} 
+        />
         
         <Field
           id="password"
@@ -79,6 +109,7 @@ export function Register() {
           autoComplete="new-password"
           required
           error={errors.password}
+          isLight={true}
         />
         
         <Field
@@ -91,12 +122,13 @@ export function Register() {
           autoComplete="new-password"
           required
           error={errors.repeatPassword}
+          isLight={true}
         />
 
-        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+        <Button type="submit" size="lg" className="w-full bg-[#9B1B3B] hover:bg-[#C42B53] text-white" disabled={loading}>
           {loading ? 'Inasajili...' : 'Jisajili'}
         </Button>
-        <p className="text-center text-xs leading-relaxed text-dust">
+        <p className="text-center text-xs leading-relaxed text-gray-500">
           Kwa kujisajili unakubali masharti ya matumizi ya KISA.
         </p>
       </form>
